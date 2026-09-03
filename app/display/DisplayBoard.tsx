@@ -22,7 +22,8 @@ export type FeedCycle = {
 export type Feed = { now: string; cycles: FeedCycle[] };
 
 const TZ = "Asia/Jerusalem";
-const t2 = (o: Intl.DateTimeFormatOptions) => new Intl.DateTimeFormat("he-IL", { timeZone: TZ, hour12: false, ...o });
+const t2 = (o: Intl.DateTimeFormatOptions) =>
+  new Intl.DateTimeFormat("he-IL", { timeZone: TZ, hour12: false, ...o });
 const timeFmt = t2({ hour: "2-digit", minute: "2-digit" });
 const clockFmt = t2({ hour: "2-digit", minute: "2-digit", second: "2-digit" });
 const dateFmt = t2({ weekday: "long", day: "2-digit", month: "2-digit", year: "numeric" });
@@ -31,10 +32,9 @@ const TERM = { briefing: "תדריך", sim: "טיסה" } as const;
 
 type Status = { key: "done" | "now" | "boarding" | "soon"; label: string; cls: string };
 function statusOf(s: FeedSlot, now: number): Status {
-  // מצב שסומן ידנית ע"י האדמין גובר על הזמן המתוכנן
   if (s.actualEndAt) return { key: "done", label: "הסתיים", cls: "text-[var(--board-dim)]" };
   if (s.actualStartAt)
-    return { key: "now", label: "בעיצומו", cls: "text-[var(--board-green)] board-blink" };
+    return { key: "now", label: "התחיל", cls: "text-[var(--board-green)] board-blink" };
   const start = new Date(s.startsAt).getTime();
   const end = new Date(s.endsAt).getTime();
   if (now >= end) return { key: "done", label: "הסתיים", cls: "text-[var(--board-dim)]" };
@@ -53,14 +53,12 @@ function statusOf(s: FeedSlot, now: number): Status {
   return { key: "soon", label, cls: "text-[var(--board-text)]" };
 }
 
-/** חלון שעדיין לא הסתיים (לפי סימון ידני או לפי הזמן המתוכנן) */
 function slotOpen(s: FeedSlot, now: number): boolean {
   if (s.actualEndAt) return false;
   if (s.actualStartAt) return true;
   return new Date(s.endsAt).getTime() >= now;
 }
 
-/** המחזור ה"חי" — הראשון שיש בו חלון שעדיין לא הסתיים */
 function liveCycleIndex(cycles: FeedCycle[], now: number): number {
   const i = cycles.findIndex((c) => c.slots.some((s) => slotOpen(s, now)));
   return i >= 0 ? i : Math.max(0, cycles.length - 1);
@@ -74,6 +72,7 @@ export function DisplayBoard({ initial }: { initial: Feed }) {
   const [clock, setClock] = useState("");
   const [idx, setIdx] = useState(() => liveCycleIndex(initial.cycles, Date.now()));
   const [isFs, setIsFs] = useState(false);
+  const [scale, setScale] = useState(1);
   const lastInteraction = useRef(0);
   const heroKey = useRef("");
   const [heroFlip, setHeroFlip] = useState(false);
@@ -98,6 +97,23 @@ export function DisplayBoard({ initial }: { initial: Feed }) {
     lastInteraction.current = Date.now();
     setIdx(liveCycleIndex(cycles, Date.now()));
   }, [cycles]);
+
+  // התאמת קנבס קבוע 1920x1080 לכל מסך (טלוויזיה / לפטופ / זום)
+  useEffect(() => {
+    const fit = () =>
+      setScale(Math.min(window.innerWidth / 1920, window.innerHeight / 1080) || 1);
+    fit();
+    const raf = requestAnimationFrame(fit);
+    window.addEventListener("resize", fit);
+    window.addEventListener("orientationchange", fit);
+    window.visualViewport?.addEventListener("resize", fit);
+    return () => {
+      cancelAnimationFrame(raf);
+      window.removeEventListener("resize", fit);
+      window.removeEventListener("orientationchange", fit);
+      window.visualViewport?.removeEventListener("resize", fit);
+    };
+  }, []);
 
   // שעון
   useEffect(() => {
@@ -181,139 +197,147 @@ export function DisplayBoard({ initial }: { initial: Feed }) {
   }, [cycle?.id, hero?.slotId]);
 
   const navBtn =
-    "select-none rounded-2xl bg-white/10 px-[1.6vw] py-[1vh] text-[clamp(1rem,2vw,2rem)] font-bold ring-1 ring-white/15 hover:bg-white/20 active:bg-white/25";
+    "select-none rounded-2xl bg-white/10 px-9 py-4 text-[30px] font-bold ring-1 ring-white/15 hover:bg-white/20 active:bg-white/25";
 
   return (
-    <div className="board flex h-screen w-screen flex-col overflow-hidden p-[2.2vw]">
-      {/* כותרת + שעון */}
-      <header className="flex items-start justify-between border-b border-[var(--board-line)] pb-[1.4vh]">
-        <div>
-          <div className="text-[clamp(1.4rem,3vw,3.4rem)] font-extrabold tracking-wide">
-            לוח תורים · סימולטור A320
+    <div className="board fixed inset-0 overflow-hidden">
+      {/* קנבס קבוע 1920x1080, מוקטן/מוגדל להתאמה מדויקת לכל מסך (טלוויזיה / לפטופ / זום) */}
+      <div
+        style={{
+          width: 1920,
+          height: 1080,
+          position: "absolute",
+          left: `calc(50% - ${960 * scale}px)`,
+          top: `calc(50% - ${540 * scale}px)`,
+          transform: `scale(${scale})`,
+          transformOrigin: "top left",
+        }}
+        className="board flex flex-col p-10"
+      >
+        {/* כותרת + שעון */}
+        <header className="flex items-start justify-between border-b-2 border-[var(--board-line)] pb-4">
+          <div>
+            <div className="text-[42px] font-extrabold tracking-wide">לוח תורים · סימולטור A320</div>
+            <div className="mt-1 text-[22px] text-[var(--board-dim)]">{dateFmt.format(new Date())}</div>
           </div>
-          <div className="mt-[0.4vh] text-[clamp(0.9rem,1.5vw,1.6rem)] text-[var(--board-dim)]">
-            {dateFmt.format(new Date())}
-          </div>
-        </div>
-        <div className="flex items-center gap-[1.2vw]">
-          <button
-            onClick={toggleFs}
-            className="rounded-xl bg-white/10 px-[1vw] py-[0.8vh] text-[clamp(0.8rem,1.3vw,1.3rem)] font-semibold ring-1 ring-white/15 hover:bg-white/20"
-          >
-            {isFs ? "יציאה ממסך מלא" : "מסך מלא"}
-          </button>
-          <div className="font-mono text-[clamp(2rem,5.4vw,6rem)] tabular-nums leading-none" suppressHydrationWarning>
-            {clock}
-          </div>
-        </div>
-      </header>
-
-      {cycles.length === 0 || !cycle ? (
-        <div className="grid flex-1 place-items-center text-[clamp(1.4rem,3vw,3rem)] text-[var(--board-dim)]">
-          אין מחזורים מתוכננים
-        </div>
-      ) : (
-        <>
-          {/* ניווט בין מחזורים */}
-          <nav className="flex items-center justify-between gap-[1.5vw] py-[1.6vh]">
-            <button onClick={() => nav(-1)} className={navBtn} aria-label="המחזור הקודם">
-              › הקודם
-            </button>
-            <div className="min-w-0 text-center">
-              <div className="truncate text-[clamp(1.4rem,3.4vw,3.6rem)] font-extrabold">{cycle.name}</div>
-              <div className="mt-[0.3vh] text-[clamp(0.9rem,1.6vw,1.7rem)] text-[var(--board-dim)]">
-                {dateFmt.format(new Date(cycle.eventDate + "T12:00:00"))}
-                <span className="mx-[0.8vw] opacity-40">·</span>
-                מחזור {safeIdx + 1} מתוך {cycles.length}
-              </div>
-            </div>
-            <div className="flex items-center gap-[0.8vw]">
-              {safeIdx !== live ? (
-                <button
-                  onClick={goLive}
-                  className="rounded-2xl bg-[var(--board-green)]/20 px-[1.4vw] py-[1vh] text-[clamp(0.9rem,1.7vw,1.7rem)] font-bold text-[var(--board-green)] ring-1 ring-[var(--board-green)]/30 hover:bg-[var(--board-green)]/30"
-                >
-                  עכשיו
-                </button>
-              ) : null}
-              <button onClick={() => nav(1)} className={navBtn} aria-label="המחזור הבא">
-                הבא ‹
-              </button>
-            </div>
-          </nav>
-
-          {/* פאנל "עכשיו" */}
-          {hero ? (
-            <section
-              className={`rounded-[1.4vw] bg-[var(--board-panel)] px-[2.4vw] py-[2.2vh] ${heroFlip ? "board-flip" : ""}`}
-              style={{ transformOrigin: "top center" }}
+          <div className="flex items-center gap-6">
+            <button
+              onClick={toggleFs}
+              className="rounded-xl bg-white/10 px-5 py-2.5 text-[19px] font-semibold ring-1 ring-white/15 hover:bg-white/20"
             >
-              <div className="flex flex-wrap items-baseline gap-x-[2vw] gap-y-[0.6vh]">
-                <span className="text-[clamp(1.2rem,2.6vw,2.8rem)] font-bold text-[var(--board-amber)]">
-                  {TERM[hero.kind]}
-                </span>
-                <span className="font-mono text-[clamp(2.4rem,6.4vw,7rem)] tabular-nums leading-none">
-                  {timeFmt.format(new Date(hero.startsAt))}
-                  <span className="text-[var(--board-dim)]">–{timeFmt.format(new Date(hero.endsAt))}</span>
-                </span>
-                <span className={`text-[clamp(1.1rem,2.6vw,2.8rem)] font-bold ${statusOf(hero, now).cls}`}>
-                  {statusOf(hero, now).label}
-                </span>
-              </div>
-              {hero.label ? (
-                <div className="mt-[0.6vh] text-[clamp(1rem,2vw,2rem)] text-[var(--board-dim)]">{hero.label}</div>
-              ) : null}
-              <div className="mt-[1.4vh] flex flex-wrap gap-[0.8vw]">
-                {hero.names.length === 0 ? (
-                  <span className="text-[clamp(1rem,2vw,2rem)] text-[var(--board-dim)]">— אין נרשמים —</span>
-                ) : (
-                  hero.names.map((n, i) => (
-                    <span
-                      key={i}
-                      className="rounded-[0.8vw] bg-black/30 px-[1.2vw] py-[0.8vh] text-[clamp(1rem,2.2vw,2.3rem)] font-semibold"
-                    >
-                      {n}
-                    </span>
-                  ))
-                )}
-              </div>
-            </section>
-          ) : null}
-
-          {/* רשימת החלונות של המחזור */}
-          <div className="mt-[1.6vh] flex-1 overflow-hidden">
-            <div className="grid grid-cols-[10ch_9ch_1fr_16ch] gap-x-[1.4vw] border-b border-[var(--board-line)] pb-[0.8vh] text-[clamp(0.8rem,1.4vw,1.4rem)] font-bold text-[var(--board-dim)]">
-              <div>שעה</div>
-              <div>סוג</div>
-              <div>משתתפים</div>
-              <div className="text-left">סטטוס</div>
+              {isFs ? "יציאה ממסך מלא" : "מסך מלא"}
+            </button>
+            <div className="font-mono text-[84px] leading-none tabular-nums" suppressHydrationWarning>
+              {clock}
             </div>
-            <ul>
-              {cycle.slots.map((s) => {
-                const st = statusOf(s, now);
-                return (
-                  <li
-                    key={s.slotId}
-                    className={`board-row grid grid-cols-[10ch_9ch_1fr_16ch] items-center gap-x-[1.4vw] py-[1.15vh] text-[clamp(1rem,2.1vw,2.2rem)] ${
-                      st.key === "done" ? "opacity-45" : ""
-                    }`}
-                  >
-                    <div className="font-mono tabular-nums">{timeFmt.format(new Date(s.startsAt))}</div>
-                    <div className="font-semibold text-[var(--board-amber)]">{TERM[s.kind]}</div>
-                    <div className="truncate">
-                      {s.names.length ? s.names.join(" · ") : "—"}
-                      <span className="mr-[0.6vw] text-[clamp(0.75rem,1.3vw,1.25rem)] text-[var(--board-dim)]">
-                        ({s.names.length}/{s.capacity})
-                      </span>
-                    </div>
-                    <div className={`text-left font-bold ${st.cls}`}>{st.label}</div>
-                  </li>
-                );
-              })}
-            </ul>
           </div>
-        </>
-      )}
+        </header>
+
+        {cycles.length === 0 || !cycle ? (
+          <div className="grid flex-1 place-items-center text-[44px] text-[var(--board-dim)]">
+            אין מחזורים מתוכננים
+          </div>
+        ) : (
+          <>
+            {/* ניווט בין מחזורים */}
+            <nav className="flex items-center justify-between gap-8 py-5">
+              <button onClick={() => nav(-1)} className={navBtn} aria-label="המחזור הקודם">
+                › הקודם
+              </button>
+              <div className="min-w-0 flex-1 text-center">
+                <div className="truncate text-[48px] font-extrabold leading-tight">{cycle.name}</div>
+                <div className="mt-1 text-[22px] text-[var(--board-dim)]">
+                  {dateFmt.format(new Date(cycle.eventDate + "T12:00:00"))}
+                  <span className="mx-3 opacity-40">·</span>
+                  מחזור {safeIdx + 1} מתוך {cycles.length}
+                </div>
+              </div>
+              <div className="flex items-center gap-4">
+                {safeIdx !== live ? (
+                  <button
+                    onClick={goLive}
+                    className="rounded-2xl bg-[var(--board-green)]/20 px-7 py-3.5 text-[24px] font-bold text-[var(--board-green)] ring-1 ring-[var(--board-green)]/30 hover:bg-[var(--board-green)]/30"
+                  >
+                    עכשיו
+                  </button>
+                ) : null}
+                <button onClick={() => nav(1)} className={navBtn} aria-label="המחזור הבא">
+                  הבא ‹
+                </button>
+              </div>
+            </nav>
+
+            {/* פאנל "עכשיו" */}
+            {hero ? (
+              <section
+                className={`rounded-3xl bg-[var(--board-panel)] px-10 py-6 ${heroFlip ? "board-flip" : ""}`}
+                style={{ transformOrigin: "top center" }}
+              >
+                <div className="flex flex-wrap items-baseline gap-x-9 gap-y-1">
+                  <span className="text-[38px] font-bold text-[var(--board-amber)]">{TERM[hero.kind]}</span>
+                  <span className="font-mono text-[88px] leading-none tabular-nums">
+                    {timeFmt.format(new Date(hero.startsAt))}
+                    <span className="text-[var(--board-dim)]">–{timeFmt.format(new Date(hero.endsAt))}</span>
+                  </span>
+                  <span className={`text-[38px] font-bold ${statusOf(hero, now).cls}`}>
+                    {statusOf(hero, now).label}
+                  </span>
+                </div>
+                {hero.label ? (
+                  <div className="mt-1 text-[26px] text-[var(--board-dim)]">{hero.label}</div>
+                ) : null}
+                <div className="mt-4 flex flex-wrap gap-3">
+                  {hero.names.length === 0 ? (
+                    <span className="text-[26px] text-[var(--board-dim)]">— אין נרשמים —</span>
+                  ) : (
+                    hero.names.map((n, i) => (
+                      <span
+                        key={i}
+                        className="rounded-xl bg-black/30 px-6 py-2 text-[30px] font-semibold"
+                      >
+                        {n}
+                      </span>
+                    ))
+                  )}
+                </div>
+              </section>
+            ) : null}
+
+            {/* רשימת החלונות של המחזור */}
+            <div className="mt-4 flex-1 overflow-hidden">
+              <div className="grid grid-cols-[11ch_9ch_1fr_15ch] gap-x-8 border-b-2 border-[var(--board-line)] pb-2 text-[21px] font-bold text-[var(--board-dim)]">
+                <div>שעה</div>
+                <div>סוג</div>
+                <div>משתתפים</div>
+                <div className="text-left">סטטוס</div>
+              </div>
+              <ul>
+                {cycle.slots.map((s) => {
+                  const st = statusOf(s, now);
+                  return (
+                    <li
+                      key={s.slotId}
+                      className={`board-row grid grid-cols-[11ch_9ch_1fr_15ch] items-center gap-x-8 py-3 text-[32px] ${
+                        st.key === "done" ? "opacity-45" : ""
+                      }`}
+                    >
+                      <div className="font-mono tabular-nums">{timeFmt.format(new Date(s.startsAt))}</div>
+                      <div className="font-semibold text-[var(--board-amber)]">{TERM[s.kind]}</div>
+                      <div className="truncate">
+                        {s.names.length ? s.names.join(" · ") : "—"}
+                        <span className="mr-3 text-[22px] text-[var(--board-dim)]">
+                          ({s.names.length}/{s.capacity})
+                        </span>
+                      </div>
+                      <div className={`text-left font-bold ${st.cls}`}>{st.label}</div>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          </>
+        )}
+      </div>
     </div>
   );
 }
