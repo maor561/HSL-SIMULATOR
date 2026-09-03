@@ -27,6 +27,7 @@ import {
   diffMinutes,
   israelLocalToUtc,
   nowOnDate,
+  todayInIsrael,
   utcToIsraelFields,
 } from "./time";
 
@@ -535,7 +536,8 @@ export async function startSlot(formData: FormData): Promise<void> {
 
   const [cycle] = await db.select().from(cycles).where(eq(cycles.id, cycleId));
   if (!cycle) return;
-  // "עכשיו" מקובע לתאריך המחזור — לא מזיז את החלונות ליום אחר
+  // מצב הפעלה זמין רק ביום המחזור — אחרת לא נוגעים בזמנים
+  if (cycle.eventDate !== todayInIsrael()) return;
   const now = nowOnDate(cycle.eventDate);
 
   const list = await db
@@ -563,6 +565,7 @@ export async function finishSlot(formData: FormData): Promise<void> {
 
   const [cycle] = await db.select().from(cycles).where(eq(cycles.id, cycleId));
   if (!cycle) return;
+  if (cycle.eventDate !== todayInIsrael()) return;
   const now = nowOnDate(cycle.eventDate);
 
   const list = await db
@@ -606,6 +609,9 @@ export async function nudgeFrom(formData: FormData): Promise<void> {
   const cycleId = String(formData.get("cycleId") ?? "");
   const minutes = Number(formData.get("minutes") ?? "0");
   if (!Number.isFinite(minutes) || minutes === 0) return;
+
+  const [cycle] = await db.select().from(cycles).where(eq(cycles.id, cycleId));
+  if (!cycle || cycle.eventDate !== todayInIsrael()) return;
 
   const list = await db
     .select()

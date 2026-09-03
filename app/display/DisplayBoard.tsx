@@ -314,7 +314,7 @@ export function DisplayBoard({ initial }: { initial: Feed }) {
             {/* ניווט בין מחזורים */}
             <nav className="flex items-center justify-between gap-8 py-5">
               <button onClick={() => nav(-1)} className={navBtn} aria-label="המחזור הקודם">
-                › הקודם
+                ‹ הקודם
               </button>
               <div className="min-w-0 flex-1 text-center">
                 <div className="truncate text-[48px] font-extrabold leading-tight">{cycle.name}</div>
@@ -334,7 +334,7 @@ export function DisplayBoard({ initial }: { initial: Feed }) {
                   </button>
                 ) : null}
                 <button onClick={() => nav(1)} className={navBtn} aria-label="המחזור הבא">
-                  הבא ‹
+                  הבא ›
                 </button>
               </div>
             </nav>

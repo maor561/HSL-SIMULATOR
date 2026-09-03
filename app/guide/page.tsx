@@ -67,9 +67,9 @@ const BODY = `
               <div class="badge">${PLANE_SM}</div>
             </div>
             <div class="s-nav">
-              <div class="btn">‹ הבא</div>
+              <div class="btn">הבא ›</div>
               <div class="mid"><div class="name">מחזור הדגמה</div><div class="meta">יום שלישי, 08.09 · מחזור 1 מתוך 4</div></div>
-              <div class="btn">הקודם ›</div>
+              <div class="btn">‹ הקודם</div>
             </div>
             <div class="s-sect"><div class="h">תדריך והסבר תאורטי</div></div>
             <div class="s-card">
@@ -88,7 +88,7 @@ const BODY = `
         <div class="step-num" data-n="1">פותחים את דף הרישום</div>
         <h3>בוחרים את המחזור הנכון</h3>
         <p>נכנסים ל־<strong>hsl-simulator.vercel.app</strong>. המסך פותח מחזור אחד בכל פעם.</p>
-        <div class="legend"><span class="n">1</span><span>לחצו <strong>‹ הבא</strong> או <strong>הקודם ›</strong> עד שמופיע שם המחזור שלכם והתאריך הנכון.</span></div>
+        <div class="legend"><span class="n">1</span><span>לחצו <strong>הבא ›</strong> או <strong>‹ הקודם</strong> עד שמופיע שם המחזור שלכם והתאריך הנכון.</span></div>
         <div class="legend"><span class="n">2</span><span>מתחת ל“תדריך והסבר תאורטי” יופיע חלון עם <strong>“X פנויים”</strong> בירוק — זה חלון שאפשר להירשם אליו.</span></div>
         <span class="next">→ השלב הבא: לחיצה על חלון התדריך</span>
       </div>
@@ -173,9 +173,9 @@ const BODY = `
         <div class="phone">
           <div class="screen">
             <div class="s-nav">
-              <div class="btn">‹ הבא</div>
+              <div class="btn">הבא ›</div>
               <div class="mid"><div class="name">מחזור הדגמה</div><div class="meta">מחזור 1 מתוך 4</div></div>
-              <div class="btn">הקודם ›</div>
+              <div class="btn">‹ הקודם</div>
             </div>
             <div class="s-sect"><div class="h">סבב סימולטור · זוג · חצי שעה</div><div class="note">נדרש שיבוץ פעיל לתדריך של אותו מחזור.</div></div>
             <div class="s-card pick">
@@ -320,7 +320,7 @@ const BODY = `
       </div>
       <div class="tr">
         <div class="q">“אפשר לתפוס חלון סימולטור רק במחזור שבו נרשמת לתדריך”</div>
-        <div class="a">אתם מנסים לתפוס זוג במחזור שונה מזה של התדריך שלכם. לחצו ‹ הבא / הקודם › עד המחזור של התדריך.</div>
+        <div class="a">אתם מנסים לתפוס זוג במחזור שונה מזה של התדריך שלכם. לחצו הבא › / ‹ הקודם עד המחזור של התדריך.</div>
       </div>
       <div class="tr">
         <div class="q">“החלון מלא. נסו חלון אחר”</div>

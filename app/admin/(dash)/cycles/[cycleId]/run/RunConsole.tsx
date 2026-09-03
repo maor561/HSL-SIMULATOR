@@ -36,9 +36,11 @@ const mins = (ms: number) => Math.max(0, Math.round(ms / 60_000));
 function Btn({
   children,
   tone = "slate",
+  disabled = false,
 }: {
   children: React.ReactNode;
   tone?: "green" | "amber" | "slate" | "rose";
+  disabled?: boolean;
 }) {
   const { pending } = useFormStatus();
   const cls = {
@@ -50,26 +52,48 @@ function Btn({
   return (
     <button
       type="submit"
-      disabled={pending}
-      className={`rounded-lg px-3 py-2 text-sm font-bold ring-1 transition disabled:opacity-50 ${cls}`}
+      disabled={pending || disabled}
+      className={`rounded-lg px-3 py-2 text-sm font-bold ring-1 transition disabled:opacity-40 disabled:cursor-not-allowed ${cls}`}
     >
       {pending ? "…" : children}
     </button>
   );
 }
 
-function Nudge({ slotId, cycleId, minutes }: { slotId: string; cycleId: string; minutes: number }) {
+function Nudge({
+  slotId,
+  cycleId,
+  minutes,
+  disabled,
+}: {
+  slotId: string;
+  cycleId: string;
+  minutes: number;
+  disabled?: boolean;
+}) {
   return (
     <form action={nudgeFrom}>
       <input type="hidden" name="slotId" value={slotId} />
       <input type="hidden" name="cycleId" value={cycleId} />
       <input type="hidden" name="minutes" value={minutes} />
-      <Btn tone="slate">{minutes > 0 ? `+${minutes}` : minutes} דק׳</Btn>
+      <Btn tone="slate" disabled={disabled}>
+        {minutes > 0 ? `+${minutes}` : minutes} דק׳
+      </Btn>
     </form>
   );
 }
 
-function SlotRow({ s, cycleId, now }: { s: RunSlot; cycleId: string; now: number }) {
+function SlotRow({
+  s,
+  cycleId,
+  now,
+  locked,
+}: {
+  s: RunSlot;
+  cycleId: string;
+  now: number;
+  locked: boolean;
+}) {
   const plannedStart = new Date(s.startsAt).getTime();
   const plannedEnd = new Date(s.endsAt).getTime();
   const started = !!s.actualStartAt;
@@ -145,7 +169,7 @@ function SlotRow({ s, cycleId, now }: { s: RunSlot; cycleId: string; now: number
           <form action={startSlot}>
             <input type="hidden" name="slotId" value={s.id} />
             <input type="hidden" name="cycleId" value={cycleId} />
-            <Btn tone="green">▶ התחל עכשיו</Btn>
+            <Btn tone="green" disabled={locked}>▶ התחל עכשיו</Btn>
           </form>
         ) : null}
 
@@ -153,7 +177,7 @@ function SlotRow({ s, cycleId, now }: { s: RunSlot; cycleId: string; now: number
           <form action={finishSlot}>
             <input type="hidden" name="slotId" value={s.id} />
             <input type="hidden" name="cycleId" value={cycleId} />
-            <Btn tone="amber">■ סיים עכשיו</Btn>
+            <Btn tone="amber" disabled={locked}>■ סיים עכשיו</Btn>
           </form>
         ) : null}
 
@@ -168,8 +192,8 @@ function SlotRow({ s, cycleId, now }: { s: RunSlot; cycleId: string; now: number
         {!finished ? (
           <div className="ms-auto flex items-center gap-2">
             <span className="text-xs text-[var(--board-dim)]">דחיפת החלון והבאים:</span>
-            <Nudge slotId={s.id} cycleId={cycleId} minutes={-5} />
-            <Nudge slotId={s.id} cycleId={cycleId} minutes={5} />
+            <Nudge slotId={s.id} cycleId={cycleId} minutes={-5} disabled={locked} />
+            <Nudge slotId={s.id} cycleId={cycleId} minutes={5} disabled={locked} />
           </div>
         ) : null}
       </div>
@@ -253,8 +277,9 @@ export function RunConsole({
 
       {!isToday ? (
         <div className="mt-4 rounded-xl border border-amber-400/30 bg-amber-500/15 px-4 py-3 text-sm text-amber-200">
-          המחזור מתוכנן ל־<strong>{dateFmt.format(new Date(eventDate + "T12:00:00"))}</strong>, לא להיום.
-          סימוני «התחל / סיים» יעדכנו את הזמנים <strong>על תאריך המחזור</strong> ולא יזיזו אותו ליום אחר.
+          המחזור מתוכנן ל־<strong>{dateFmt.format(new Date(eventDate + "T12:00:00"))}</strong>, לא להיום —
+          סימוני «התחל / סיים / דחיפה» <strong>נעולים</strong> עד יום המחזור, כדי לא לפגוע בלוח הזמנים.
+          אפשר לצפות, ולהשתמש ב«↺ איפוס הפעלה» או ב«לוח זמנים» כדי לתקן.
         </div>
       ) : null}
 
@@ -263,7 +288,7 @@ export function RunConsole({
       ) : (
         <ul className="mt-4 space-y-3">
           {slots.map((s) => (
-            <SlotRow key={s.id} s={s} cycleId={cycleId} now={now} />
+            <SlotRow key={s.id} s={s} cycleId={cycleId} now={now} locked={!isToday} />
           ))}
         </ul>
       )}

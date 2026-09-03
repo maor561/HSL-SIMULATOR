@@ -116,7 +116,7 @@ export function RegisterBoard({ cycles }: { cycles: RCycle[] }) {
         <>
           <nav className="flex items-center justify-between gap-3 px-4 py-4 sm:px-8">
             <button onClick={() => nav(-1)} className={navBtn} aria-label="המחזור הקודם">
-              › הקודם
+              ‹ הקודם
             </button>
             <div className="min-w-0 flex-1 text-center">
               <div className="truncate text-xl font-extrabold sm:text-2xl">{cycle.name}</div>
@@ -127,7 +127,7 @@ export function RegisterBoard({ cycles }: { cycles: RCycle[] }) {
               </div>
             </div>
             <button onClick={() => nav(1)} className={navBtn} aria-label="המחזור הבא">
-              הבא ‹
+              הבא ›
             </button>
           </nav>
 
