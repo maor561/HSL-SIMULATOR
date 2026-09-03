@@ -10,9 +10,12 @@ const initial: FormState = {};
 export function BookingForm({
   slotId,
   kind,
+  onDone,
 }: {
   slotId: string;
   kind: "briefing" | "sim";
+  /** אם מסופק — נקרא בסיום מוצלח (למשל לסגור חלונית ולרענן) */
+  onDone?: () => void;
 }) {
   const [state, formAction] = useActionState(bookSlot, initial);
 
@@ -25,18 +28,27 @@ export function BookingForm({
             ? "נרשמת לתדריך. עכשיו אפשר לתפוס גם חלון סימולטור באותו מחזור."
             : "נרשמת לסבב הסימולטור."}
         </p>
-        <div className="mt-4 flex justify-center gap-3">
+        <div className="mt-4 flex flex-wrap justify-center gap-3">
+          {onDone ? (
+            <button
+              onClick={onDone}
+              className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700"
+            >
+              המשך
+            </button>
+          ) : (
+            <Link
+              href="/"
+              className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700"
+            >
+              חזרה לרשימה
+            </Link>
+          )}
           <Link
             href="/my"
-            className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700"
-          >
-            לשיבוצים שלי
-          </Link>
-          <Link
-            href="/"
             className="rounded-lg border border-emerald-300 px-4 py-2 text-sm font-semibold text-emerald-800 hover:bg-emerald-100"
           >
-            חזרה לרשימה
+            לשיבוצים שלי
           </Link>
         </div>
       </div>

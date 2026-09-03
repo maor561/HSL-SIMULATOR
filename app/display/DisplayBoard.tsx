@@ -69,42 +69,45 @@ function liveCycleIndex(cycles: FeedCycle[], now: number): number {
 
 const IDLE_MS = 45_000;
 
-/** גלילה אופקית אוטומטית כשהתוכן ארוך מהתא. `dep` מפעיל מדידה מחדש. */
+/** גלילת "רצועת חדשות" רציפה — הטקסט זורם, מסתיים, ומתחיל מחדש. */
+const MARQUEE_PX_PER_SEC = 24; // מהירות רצועה איטית (רצועת חדשות)
+const MARQUEE_GAP = 72; // רווח בין סוף הטקסט להתחלה החוזרת
+
 function Marquee({
   children,
   dep,
   className = "",
-  gap = 48,
 }: {
   children: React.ReactNode;
   dep: string;
   className?: string;
-  gap?: number;
 }) {
   const wrap = useRef<HTMLDivElement>(null);
-  const inner = useRef<HTMLDivElement>(null);
+  const track = useRef<HTMLDivElement>(null);
+  const first = useRef<HTMLSpanElement>(null);
+  const second = useRef<HTMLSpanElement>(null);
 
   useEffect(() => {
     const w = wrap.current;
-    const i = inner.current;
-    if (!w || !i) return;
+    const tr = track.current;
+    const f = first.current;
+    const s = second.current;
+    if (!w || !tr || !f || !s) return;
     let anim: Animation | undefined;
     const setup = () => {
       anim?.cancel();
-      i.style.transform = "translateX(0)";
-      const diff = i.scrollWidth - w.clientWidth;
-      if (diff <= 6) return;
+      tr.style.transform = "translateX(0)";
+      // scrollWidth/clientWidth הם ב-px של הפריסה — לא מושפעים מה-scale של הקנבס
+      const fw = f.scrollWidth;
+      const need = fw > w.clientWidth + 4;
+      s.style.display = need ? "flex" : "none";
+      if (!need) return;
       if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return;
-      const d = diff + gap;
-      anim = i.animate(
-        [
-          { transform: "translateX(0)", offset: 0 },
-          { transform: "translateX(0)", offset: 0.1 },
-          { transform: `translateX(${d}px)`, offset: 0.5 },
-          { transform: `translateX(${d}px)`, offset: 0.6 },
-          { transform: "translateX(0)", offset: 1 },
-        ],
-        { duration: Math.max(7000, d * 38), iterations: Infinity, easing: "ease-in-out" },
+      const shift = fw + MARQUEE_GAP;
+      // RTL: הטקסט זורם ימינה, יוצא מימין ונכנס מחדש משמאל
+      anim = tr.animate(
+        [{ transform: "translateX(0)" }, { transform: `translateX(${shift}px)` }],
+        { duration: (shift / MARQUEE_PX_PER_SEC) * 1000, iterations: Infinity, easing: "linear" },
       );
     };
     setup();
@@ -114,12 +117,22 @@ function Marquee({
       ro.disconnect();
       anim?.cancel();
     };
-  }, [dep, gap]);
+  }, [dep]);
 
   return (
     <div ref={wrap} className={`overflow-hidden ${className}`}>
-      <div ref={inner} className="inline-flex w-max items-center gap-3 whitespace-nowrap will-change-transform">
-        {children}
+      <div ref={track} className="flex w-max whitespace-nowrap will-change-transform">
+        <span ref={first} className="flex shrink-0 items-center gap-3">
+          {children}
+        </span>
+        <span
+          ref={second}
+          aria-hidden
+          className="shrink-0 items-center gap-3"
+          style={{ display: "none", marginInlineStart: MARQUEE_GAP }}
+        >
+          {children}
+        </span>
       </div>
     </div>
   );
