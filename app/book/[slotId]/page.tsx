@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { getSlotForBooking } from "@/lib/queries";
 import { BookingForm } from "@/components/BookingForm";
 import { SiteHeader } from "@/components/SiteHeader";
+import { PlaneMark } from "@/components/PlaneMark";
 import { fmtDate, fmtRange, fmtWeekday, isPast } from "@/lib/time";
 
 export const dynamic = "force-dynamic";
@@ -22,19 +23,26 @@ export default async function BookPage({
   const unavailable = past || !slot.isOpen || free === 0;
 
   return (
-    <div className="min-h-full">
+    <div className="min-h-full bg-slate-50">
       <SiteHeader />
       <main className="mx-auto max-w-lg px-4 py-8">
         <Link href="/" className="text-sm text-slate-500 hover:text-slate-800">
           → חזרה לרשימת המחזורים
         </Link>
 
-        <div className="mt-4 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-          <div className="text-sm font-semibold uppercase tracking-wide text-blue-600">
-            {slot.kind === "briefing" ? "תדריך והסבר תאורטי" : "סבב סימולטור"}
+        <div className="a-card mt-4 overflow-hidden">
+          <div className="sky-deep flex items-center gap-3 px-6 py-4 text-white">
+            <PlaneMark className="h-9 w-9 text-white/90" />
+            <div>
+              <div className="text-xs font-semibold uppercase tracking-wide text-sky-200">
+                {slot.kind === "briefing" ? "תדריך והסבר תאורטי" : "סבב סימולטור · A320"}
+              </div>
+              <h1 className="text-lg font-extrabold">{cycle.name}</h1>
+            </div>
           </div>
-          <h1 className="mt-1 text-xl font-bold text-slate-900">{cycle.name}</h1>
-          <div className="mt-1 text-sm text-slate-600">
+
+          <div className="p-6">
+          <div className="text-sm text-slate-600">
             {fmtWeekday(cycle.eventDate + "T12:00:00")} · {fmtDate(cycle.eventDate + "T12:00:00")}
             <br />
             {fmtRange(slot.startsAt, slot.endsAt)}
@@ -61,6 +69,7 @@ export default async function BookPage({
               <BookingForm slotId={slot.id} kind={slot.kind} />
             </>
           )}
+          </div>
         </div>
       </main>
     </div>

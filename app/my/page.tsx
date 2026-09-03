@@ -19,17 +19,17 @@ export default async function MyPage({
   const rows = valid ? await getBookingsByPhone(phone) : [];
 
   return (
-    <div className="min-h-full">
+    <div className="min-h-full bg-slate-50">
       <SiteHeader />
       <main className="mx-auto max-w-lg px-4 py-8">
-        <h1 className="text-2xl font-bold text-slate-900">השיבוצים שלי</h1>
+        <h1 className="text-2xl font-extrabold text-slate-900">השיבוצים שלי</h1>
 
         {!valid ? (
           <>
             <p className="mt-2 text-sm text-slate-600">
               הזינו שם מלא וטלפון כדי לראות ולבטל שיבוצים.
             </p>
-            <div className="mt-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+            <div className="a-card mt-6 p-6">
               <LookupForm />
             </div>
           </>
@@ -54,11 +54,11 @@ export default async function MyPage({
                 {rows.map((b) => (
                   <li
                     key={b.id}
-                    className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white p-4"
+                    className="a-card flex items-center justify-between gap-3 p-4"
                   >
                     <div className="min-w-0">
-                      <div className="text-xs font-semibold uppercase tracking-wide text-blue-600">
-                        {b.kind === "briefing" ? "תדריך" : "סימולטור"}
+                      <div className="text-xs font-semibold uppercase tracking-wide text-brand">
+                        {b.kind === "briefing" ? "תדריך" : "סימולטור · A320"}
                       </div>
                       <div className="font-semibold text-slate-900">{b.cycleName}</div>
                       <div className="text-sm text-slate-500">
