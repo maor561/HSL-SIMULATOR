@@ -1,5 +1,5 @@
 import "server-only";
-import { and, asc, desc, eq, sql, type SQL } from "drizzle-orm";
+import { and, asc, eq, sql, type SQL } from "drizzle-orm";
 import { db } from "./db";
 import { bookings, cycles, slots } from "./db/schema";
 
@@ -187,7 +187,10 @@ export async function getDisplayCycles(): Promise<DisplayCycle[]> {
 /* ---------- אדמין ---------- */
 
 export async function adminListCycles() {
-  const rows = await db.select().from(cycles).orderBy(desc(cycles.eventDate));
+  const rows = await db
+    .select()
+    .from(cycles)
+    .orderBy(asc(cycles.eventDate), asc(cycles.createdAt));
   const out = [];
   for (const c of rows) {
     const [{ count }] = await db
