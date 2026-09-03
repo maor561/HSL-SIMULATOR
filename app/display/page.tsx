@@ -17,6 +17,8 @@ export default async function DisplayPage() {
         startsAt: s.startsAt.toISOString(),
         endsAt: s.endsAt.toISOString(),
         capacity: s.capacity,
+        actualStartAt: s.actualStartAt?.toISOString() ?? null,
+        actualEndAt: s.actualEndAt?.toISOString() ?? null,
         names: s.names,
       }))
       .sort((a, b) => a.startsAt.localeCompare(b.startsAt)),

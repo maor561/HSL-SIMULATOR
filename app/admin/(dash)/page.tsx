@@ -95,6 +95,12 @@ export default async function AdminHome() {
                     </button>
                   </form>
                   <Link
+                    href={`/admin/cycles/${c.id}/run`}
+                    className="rounded-lg bg-slate-900 px-3 py-1.5 text-sm font-bold text-white hover:bg-slate-800"
+                  >
+                    ▶ הפעלה
+                  </Link>
+                  <Link
                     href={`/admin/cycles/${c.id}`}
                     className="rounded-lg bg-brand px-3 py-1.5 text-sm font-bold text-white hover:brightness-110"
                   >

@@ -125,6 +125,12 @@ export default async function CyclePage({
             </div>
           </div>
           <div className="flex items-center gap-2">
+            <Link
+              href={`/admin/cycles/${cycle.id}/run`}
+              className="rounded-lg bg-slate-900 px-3 py-1.5 text-sm font-bold text-white hover:bg-slate-800"
+            >
+              ▶ מצב הפעלה
+            </Link>
             <span
               className={`rounded-full px-2.5 py-0.5 text-[11px] font-bold ${
                 cycle.isPublished

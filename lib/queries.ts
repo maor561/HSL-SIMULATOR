@@ -1,5 +1,5 @@
 import "server-only";
-import { and, asc, desc, eq, sql } from "drizzle-orm";
+import { and, asc, desc, eq, sql, type SQL } from "drizzle-orm";
 import { db } from "./db";
 import { bookings, cycles, slots } from "./db/schema";
 
@@ -12,6 +12,8 @@ export type SlotWithCount = {
   endsAt: Date;
   capacity: number;
   isOpen: boolean;
+  actualStartAt: Date | null;
+  actualEndAt: Date | null;
   taken: number;
 };
 
@@ -21,8 +23,9 @@ export type CycleWithSlots = {
   sims: SlotWithCount[];
 };
 
-function withCount() {
-  return db
+/** חלונות עם ספירת שיבוצים פעילים, דרך LEFT JOIN + GROUP BY */
+function slotsWithCount(where: SQL | undefined, ordered = true) {
+  let q = db
     .select({
       id: slots.id,
       cycleId: slots.cycleId,
@@ -32,12 +35,17 @@ function withCount() {
       endsAt: slots.endsAt,
       capacity: slots.capacity,
       isOpen: slots.isOpen,
-      taken: sql<number>`(
-        select count(*)::int from ${bookings}
-        where ${bookings.slotId} = ${slots.id} and ${bookings.status} = 'active'
-      )`,
+      actualStartAt: slots.actualStartAt,
+      actualEndAt: slots.actualEndAt,
+      taken: sql<number>`count(${bookings.id})::int`,
     })
-    .from(slots);
+    .from(slots)
+    .leftJoin(bookings, and(eq(bookings.slotId, slots.id), eq(bookings.status, "active")))
+    .$dynamic();
+  if (where) q = q.where(where);
+  q = q.groupBy(slots.id);
+  if (ordered) q = q.orderBy(asc(slots.startsAt));
+  return q as unknown as Promise<SlotWithCount[]>;
 }
 
 /** מחזורים שפורסמו, עם החלונות שלהם — לעמוד השיבוץ הציבורי */
@@ -50,9 +58,7 @@ export async function getPublishedCycles(): Promise<CycleWithSlots[]> {
 
   const result: CycleWithSlots[] = [];
   for (const c of rows) {
-    const s = (await withCount()
-      .where(eq(slots.cycleId, c.id))
-      .orderBy(asc(slots.startsAt))) as SlotWithCount[];
+    const s = await slotsWithCount(eq(slots.cycleId, c.id));
     result.push({
       cycle: c,
       briefings: s.filter((x) => x.kind === "briefing"),
@@ -63,7 +69,7 @@ export async function getPublishedCycles(): Promise<CycleWithSlots[]> {
 }
 
 export async function getSlotForBooking(slotId: string) {
-  const [row] = (await withCount().where(eq(slots.id, slotId))) as SlotWithCount[];
+  const [row] = await slotsWithCount(eq(slots.id, slotId), false);
   if (!row) return null;
   const [cycle] = await db.select().from(cycles).where(eq(cycles.id, row.cycleId));
   return { slot: row, cycle };
@@ -115,6 +121,8 @@ export type DisplaySlot = {
   startsAt: Date;
   endsAt: Date;
   capacity: number;
+  actualStartAt: Date | null;
+  actualEndAt: Date | null;
   names: string[];
 };
 export type DisplayCycle = {
@@ -137,6 +145,8 @@ export async function getDisplayCycles(): Promise<DisplayCycle[]> {
       startsAt: slots.startsAt,
       endsAt: slots.endsAt,
       capacity: slots.capacity,
+      actualStartAt: slots.actualStartAt,
+      actualEndAt: slots.actualEndAt,
       bookingName: bookings.fullName,
     })
     .from(cycles)
@@ -162,6 +172,8 @@ export async function getDisplayCycles(): Promise<DisplayCycle[]> {
         startsAt: r.startsAt,
         endsAt: r.endsAt,
         capacity: r.capacity,
+        actualStartAt: r.actualStartAt,
+        actualEndAt: r.actualEndAt,
         names: [],
       };
       slMap.set(r.slotId, sl);
@@ -194,9 +206,7 @@ export async function adminListCycles() {
 export async function adminGetCycle(cycleId: string) {
   const [cycle] = await db.select().from(cycles).where(eq(cycles.id, cycleId));
   if (!cycle) return null;
-  const s = (await withCount()
-    .where(eq(slots.cycleId, cycleId))
-    .orderBy(asc(slots.startsAt))) as SlotWithCount[];
+  const s = await slotsWithCount(eq(slots.cycleId, cycleId));
   return { cycle, slots: s };
 }
 

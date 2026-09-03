@@ -9,6 +9,8 @@ export type FeedSlot = {
   startsAt: string;
   endsAt: string;
   capacity: number;
+  actualStartAt: string | null;
+  actualEndAt: string | null;
   names: string[];
 };
 export type FeedCycle = {
@@ -29,12 +31,16 @@ const TERM = { briefing: "תדריך", sim: "טיסה" } as const;
 
 type Status = { key: "done" | "now" | "boarding" | "soon"; label: string; cls: string };
 function statusOf(s: FeedSlot, now: number): Status {
+  // מצב שסומן ידנית ע"י האדמין גובר על הזמן המתוכנן
+  if (s.actualEndAt) return { key: "done", label: "הסתיים", cls: "text-[var(--board-dim)]" };
+  if (s.actualStartAt)
+    return { key: "now", label: "בעיצומו", cls: "text-[var(--board-green)] board-blink" };
   const start = new Date(s.startsAt).getTime();
   const end = new Date(s.endsAt).getTime();
   if (now >= end) return { key: "done", label: "הסתיים", cls: "text-[var(--board-dim)]" };
   if (now >= start) return { key: "now", label: "עכשיו", cls: "text-[var(--board-green)] board-blink" };
   const mins = Math.ceil((start - now) / 60_000);
-  if (mins <= 15) return { key: "boarding", label: "התייצבות", cls: "text-[var(--board-amber)]" };
+  if (mins <= 15) return { key: "boarding", label: "בטיסה", cls: "text-[var(--board-amber)]" };
   let label: string;
   if (mins >= 24 * 60) {
     const days = Math.round(mins / (24 * 60));
@@ -47,9 +53,16 @@ function statusOf(s: FeedSlot, now: number): Status {
   return { key: "soon", label, cls: "text-[var(--board-text)]" };
 }
 
+/** חלון שעדיין לא הסתיים (לפי סימון ידני או לפי הזמן המתוכנן) */
+function slotOpen(s: FeedSlot, now: number): boolean {
+  if (s.actualEndAt) return false;
+  if (s.actualStartAt) return true;
+  return new Date(s.endsAt).getTime() >= now;
+}
+
 /** המחזור ה"חי" — הראשון שיש בו חלון שעדיין לא הסתיים */
 function liveCycleIndex(cycles: FeedCycle[], now: number): number {
-  const i = cycles.findIndex((c) => c.slots.some((s) => new Date(s.endsAt).getTime() >= now));
+  const i = cycles.findIndex((c) => c.slots.some((s) => slotOpen(s, now)));
   return i >= 0 ? i : Math.max(0, cycles.length - 1);
 }
 
@@ -146,12 +159,14 @@ export function DisplayBoard({ initial }: { initial: Feed }) {
 
   const hero = useMemo(() => {
     if (!cycle) return null;
+    const running = cycle.slots.find((s) => s.actualStartAt && !s.actualEndAt);
+    if (running) return running;
     const liveSlot = cycle.slots.find((s) => {
       const st = new Date(s.startsAt).getTime();
       const en = new Date(s.endsAt).getTime();
-      return now >= st && now < en;
+      return !s.actualEndAt && now >= st && now < en;
     });
-    const next = cycle.slots.find((s) => new Date(s.endsAt).getTime() >= now);
+    const next = cycle.slots.find((s) => slotOpen(s, now));
     return liveSlot ?? next ?? cycle.slots[cycle.slots.length - 1] ?? null;
   }, [cycle, now]);
 

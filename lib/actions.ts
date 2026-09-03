@@ -437,3 +437,119 @@ export async function adminCancelBooking(formData: FormData): Promise<void> {
   revalidatePath("/");
   revalidatePath("/display");
 }
+
+/* ============ אדמין: מצב הפעלה (זמן אמת) ============ */
+
+const GRACE_MS = 60_000;
+
+function revalidateRun(cycleId: string) {
+  revalidatePath(`/admin/cycles/${cycleId}/run`);
+  revalidatePath(`/admin/cycles/${cycleId}`);
+  revalidatePath("/display");
+  revalidatePath("/");
+  revalidatePath("/my");
+}
+
+/** משרשר מחדש את משך החלונות מאינדקס נתון, החל מ-cursor */
+async function reflowTail(
+  list: (typeof slots.$inferSelect)[],
+  fromIndex: number,
+  cursor: Date,
+) {
+  for (const s of list.slice(fromIndex)) {
+    const dur = Math.max(5, diffMinutes(s.startsAt, s.endsAt));
+    const end = addMinutes(cursor, dur);
+    await db.update(slots).set({ startsAt: cursor, endsAt: end }).where(eq(slots.id, s.id));
+    cursor = end;
+  }
+}
+
+/** מסמן שחלון התחיל עכשיו. אם באיחור — דוחף את החלון ואת אלה שאחריו. */
+export async function startSlot(formData: FormData): Promise<void> {
+  await requireAdmin();
+  const slotId = String(formData.get("slotId") ?? "");
+  const cycleId = String(formData.get("cycleId") ?? "");
+  const now = new Date();
+
+  const list = await db
+    .select()
+    .from(slots)
+    .where(eq(slots.cycleId, cycleId))
+    .orderBy(slots.startsAt);
+  const idx = list.findIndex((s) => s.id === slotId);
+  if (idx < 0) return;
+
+  await db.update(slots).set({ actualStartAt: now, actualEndAt: null }).where(eq(slots.id, slotId));
+
+  // התחלה מאוחרת → דוחפים את הרצף מהחלון הזה
+  if (now.getTime() - list[idx].startsAt.getTime() > GRACE_MS) {
+    await reflowTail(list, idx, now);
+  }
+  revalidateRun(cycleId);
+}
+
+/** מסמן שחלון הסתיים עכשיו. מיישר את הזמן המתוכנן למציאות ודוחף את הבאים. */
+export async function finishSlot(formData: FormData): Promise<void> {
+  await requireAdmin();
+  const slotId = String(formData.get("slotId") ?? "");
+  const cycleId = String(formData.get("cycleId") ?? "");
+  const now = new Date();
+
+  const list = await db
+    .select()
+    .from(slots)
+    .where(eq(slots.cycleId, cycleId))
+    .orderBy(slots.startsAt);
+  const idx = list.findIndex((s) => s.id === slotId);
+  if (idx < 0) return;
+
+  const cur = list[idx];
+  const startBase = cur.actualStartAt ?? cur.startsAt;
+  await db
+    .update(slots)
+    .set({ actualEndAt: now, startsAt: startBase, endsAt: now })
+    .where(eq(slots.id, slotId));
+
+  // אם המציאות שונה מהמתוכנן — דוחפים את החלונות הבאים כך שיתחילו עכשיו
+  if (Math.abs(now.getTime() - cur.endsAt.getTime()) > GRACE_MS) {
+    await reflowTail(list, idx + 1, now);
+  }
+  revalidateRun(cycleId);
+}
+
+/** מבטל סימון התחלה/סיום של חלון (לא מחזיר זמנים שהוזזו). */
+export async function resetSlotRun(formData: FormData): Promise<void> {
+  await requireAdmin();
+  const slotId = String(formData.get("slotId") ?? "");
+  const cycleId = String(formData.get("cycleId") ?? "");
+  await db
+    .update(slots)
+    .set({ actualStartAt: null, actualEndAt: null })
+    .where(eq(slots.id, slotId));
+  revalidateRun(cycleId);
+}
+
+/** דוחף חלון וכל שאחריו ב-N דקות (חיובי=עיכוב, שלילי=הקדמה). */
+export async function nudgeFrom(formData: FormData): Promise<void> {
+  await requireAdmin();
+  const slotId = String(formData.get("slotId") ?? "");
+  const cycleId = String(formData.get("cycleId") ?? "");
+  const minutes = Number(formData.get("minutes") ?? "0");
+  if (!Number.isFinite(minutes) || minutes === 0) return;
+
+  const list = await db
+    .select()
+    .from(slots)
+    .where(eq(slots.cycleId, cycleId))
+    .orderBy(slots.startsAt);
+  const idx = list.findIndex((s) => s.id === slotId);
+  if (idx < 0) return;
+
+  for (const s of list.slice(idx)) {
+    await db
+      .update(slots)
+      .set({ startsAt: addMinutes(s.startsAt, minutes), endsAt: addMinutes(s.endsAt, minutes) })
+      .where(eq(slots.id, s.id));
+  }
+  revalidateRun(cycleId);
+}

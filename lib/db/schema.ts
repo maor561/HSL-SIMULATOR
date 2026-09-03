@@ -44,6 +44,9 @@ export const slots = pgTable(
     endsAt: timestamp("ends_at", { withTimezone: true }).notNull(),
     capacity: integer("capacity").notNull(), // תדריך: 10, סימולטור: 2
     isOpen: boolean("is_open").notNull().default(true),
+    // מצב הפעלה בזמן אמת — נקבע ע"י האדמין במסך ההרצה
+    actualStartAt: timestamp("actual_start_at", { withTimezone: true }),
+    actualEndAt: timestamp("actual_end_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [index("slots_cycle_starts_idx").on(t.cycleId, t.startsAt)],
