@@ -69,6 +69,62 @@ function liveCycleIndex(cycles: FeedCycle[], now: number): number {
 
 const IDLE_MS = 45_000;
 
+/** גלילה אופקית אוטומטית כשהתוכן ארוך מהתא. `dep` מפעיל מדידה מחדש. */
+function Marquee({
+  children,
+  dep,
+  className = "",
+  gap = 48,
+}: {
+  children: React.ReactNode;
+  dep: string;
+  className?: string;
+  gap?: number;
+}) {
+  const wrap = useRef<HTMLDivElement>(null);
+  const inner = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const w = wrap.current;
+    const i = inner.current;
+    if (!w || !i) return;
+    let anim: Animation | undefined;
+    const setup = () => {
+      anim?.cancel();
+      i.style.transform = "translateX(0)";
+      const diff = i.scrollWidth - w.clientWidth;
+      if (diff <= 6) return;
+      if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return;
+      const d = diff + gap;
+      anim = i.animate(
+        [
+          { transform: "translateX(0)", offset: 0 },
+          { transform: "translateX(0)", offset: 0.1 },
+          { transform: `translateX(${d}px)`, offset: 0.5 },
+          { transform: `translateX(${d}px)`, offset: 0.6 },
+          { transform: "translateX(0)", offset: 1 },
+        ],
+        { duration: Math.max(7000, d * 38), iterations: Infinity, easing: "ease-in-out" },
+      );
+    };
+    setup();
+    const ro = new ResizeObserver(setup);
+    ro.observe(w);
+    return () => {
+      ro.disconnect();
+      anim?.cancel();
+    };
+  }, [dep, gap]);
+
+  return (
+    <div ref={wrap} className={`overflow-hidden ${className}`}>
+      <div ref={inner} className="inline-flex w-max items-center gap-3 whitespace-nowrap will-change-transform">
+        {children}
+      </div>
+    </div>
+  );
+}
+
 export function DisplayBoard({ initial }: { initial: Feed }) {
   const [feed, setFeed] = useState<Feed>(initial);
   const [now, setNow] = useState(() => Date.now());
@@ -289,20 +345,20 @@ export function DisplayBoard({ initial }: { initial: Feed }) {
                 {hero.label ? (
                   <div className="mt-1 text-[26px] text-[var(--board-dim)]">{hero.label}</div>
                 ) : null}
-                <div className="mt-4 flex flex-wrap gap-3">
-                  {hero.names.length === 0 ? (
-                    <span className="text-[26px] text-[var(--board-dim)]">— אין נרשמים —</span>
-                  ) : (
-                    hero.names.map((n, i) => (
+                {hero.names.length === 0 ? (
+                  <div className="mt-4 text-[26px] text-[var(--board-dim)]">— אין נרשמים —</div>
+                ) : (
+                  <Marquee className="mt-4" dep={hero.slotId + hero.names.join("|")}>
+                    {hero.names.map((n, i) => (
                       <span
                         key={i}
                         className="rounded-xl bg-black/30 px-6 py-2 text-[30px] font-semibold"
                       >
                         {n}
                       </span>
-                    ))
-                  )}
-                </div>
+                    ))}
+                  </Marquee>
+                )}
               </section>
             ) : null}
 
@@ -326,11 +382,13 @@ export function DisplayBoard({ initial }: { initial: Feed }) {
                     >
                       <div className="font-mono tabular-nums">{timeFmt.format(new Date(s.startsAt))}</div>
                       <div className="font-semibold text-[var(--board-amber)]">{TERM[s.kind]}</div>
-                      <div className="truncate">
-                        {s.names.length ? s.names.join(" · ") : "—"}
-                        <span className="mr-3 text-[22px] text-[var(--board-dim)]">
+                      <div className="flex min-w-0 items-center gap-3">
+                        <span className="shrink-0 text-[22px] text-[var(--board-dim)]">
                           ({s.names.length}/{s.capacity})
                         </span>
+                        <Marquee className="min-w-0 flex-1" dep={s.names.join("|")}>
+                          {s.names.length ? s.names.join("  ·  ") : "—"}
+                        </Marquee>
                       </div>
                       <div className={`text-left font-bold ${st.cls}`}>{st.label}</div>
                     </li>

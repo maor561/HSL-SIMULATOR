@@ -8,7 +8,7 @@
 import { config } from "dotenv";
 config({ path: ".env.local" });
 
-import { and, eq } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { db } from "../lib/db";
 import { bookings, cycles, slots } from "../lib/db/schema";
 
