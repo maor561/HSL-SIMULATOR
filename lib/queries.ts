@@ -15,6 +15,7 @@ export type SlotWithCount = {
   actualStartAt: Date | null;
   actualEndAt: Date | null;
   taken: number;
+  names: string[];
 };
 
 export type CycleWithSlots = {
@@ -38,6 +39,9 @@ function slotsWithCount(where: SQL | undefined, ordered = true) {
       actualStartAt: slots.actualStartAt,
       actualEndAt: slots.actualEndAt,
       taken: sql<number>`count(${bookings.id})::int`,
+      names: sql<
+        string[]
+      >`coalesce(array_agg(${bookings.fullName} order by ${bookings.createdAt}) filter (where ${bookings.fullName} is not null), '{}')`,
     })
     .from(slots)
     .leftJoin(bookings, and(eq(bookings.slotId, slots.id), eq(bookings.status, "active")))

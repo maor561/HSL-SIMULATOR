@@ -15,6 +15,7 @@ export type RSlot = {
   capacity: number;
   isOpen: boolean;
   taken: number;
+  names: string[];
 };
 export type RCycle = {
   id: string;
@@ -234,6 +235,20 @@ function SlotCard({
         {s.label ? (
           <div className="mt-1 text-sm text-[var(--board-dim)]">{s.label}</div>
         ) : null}
+
+        {s.names.length > 0 ? (
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {s.names.map((n, i) => (
+              <span
+                key={i}
+                className="rounded-md bg-white/10 px-2 py-0.5 text-xs text-[var(--board-text)]"
+              >
+                {n}
+              </span>
+            ))}
+          </div>
+        ) : null}
+
         <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/10">
           <span
             className={`block h-full rounded-full ${full ? "bg-rose-400" : "bg-[var(--board-green)]"}`}

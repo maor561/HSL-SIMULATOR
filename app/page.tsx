@@ -13,6 +13,7 @@ function toRSlot(s: SlotWithCount): RSlot {
     capacity: s.capacity,
     isOpen: s.isOpen,
     taken: s.taken,
+    names: s.names,
   };
 }
 
