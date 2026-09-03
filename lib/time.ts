@@ -17,6 +17,32 @@ export function diffMinutes(a: Date, b: Date): number {
   return Math.round((b.getTime() - a.getTime()) / 60_000);
 }
 
+/** התאריך של היום בזמן ישראל, בפורמט YYYY-MM-DD */
+export function todayInIsrael(): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: TZ,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
+}
+
+/**
+ * "עכשיו" אבל מקובע לתאריך נתון — שעת היום הנוכחית בזמן ישראל, על התאריך שהתקבל.
+ * כך פעולות "מצב הפעלה" שומרות את החלונות על תאריך המחזור ולא מזיזות אותם ל-היום.
+ */
+export function nowOnDate(dateStr: string): Date {
+  const p = new Intl.DateTimeFormat("en-GB", {
+    timeZone: TZ,
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).formatToParts(new Date());
+  const hh = p.find((x) => x.type === "hour")?.value ?? "00";
+  const mm = p.find((x) => x.type === "minute")?.value ?? "00";
+  return israelLocalToUtc(dateStr, `${hh}:${mm}`);
+}
+
 const timeFmt = new Intl.DateTimeFormat("he-IL", {
   timeZone: TZ,
   hour: "2-digit",

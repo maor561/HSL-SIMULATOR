@@ -166,11 +166,13 @@ export function RunConsole({
   cycleId,
   cycleName,
   eventDate,
+  isToday,
   slots,
 }: {
   cycleId: string;
   cycleName: string;
   eventDate: string;
+  isToday: boolean;
   slots: RunSlot[];
 }) {
   const router = useRouter();
@@ -221,6 +223,13 @@ export function RunConsole({
           </div>
         </div>
       </header>
+
+      {!isToday ? (
+        <div className="mt-4 rounded-xl border border-amber-400/30 bg-amber-500/15 px-4 py-3 text-sm text-amber-200">
+          המחזור מתוכנן ל־<strong>{dateFmt.format(new Date(eventDate + "T12:00:00"))}</strong>, לא להיום.
+          סימוני «התחל / סיים» יעדכנו את הזמנים <strong>על תאריך המחזור</strong> ולא יזיזו אותו ליום אחר.
+        </div>
+      ) : null}
 
       {slots.length === 0 ? (
         <p className="py-10 text-center text-[var(--board-dim)]">אין חלונות במחזור הזה.</p>

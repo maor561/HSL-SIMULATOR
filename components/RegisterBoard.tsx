@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { BookingForm } from "./BookingForm";
 import { PlaneMark } from "./PlaneMark";
+import { GUIDE_URL } from "@/lib/links";
 
 export type RSlot = {
   id: string;
@@ -91,12 +92,22 @@ export function RegisterBoard({ cycles }: { cycles: RCycle[] }) {
             <div className="text-[11px] text-[var(--board-dim)]">שם מלא וטלפון בלבד</div>
           </div>
         </div>
-        <Link
-          href="/my"
-          className="rounded-lg px-3 py-1.5 text-sm font-medium text-[var(--board-dim)] hover:bg-white/10 hover:text-[var(--board-text)]"
-        >
-          השיבוצים שלי
-        </Link>
+        <div className="flex items-center gap-1">
+          <a
+            href={GUIDE_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="rounded-lg px-3 py-1.5 text-sm font-medium text-[var(--board-dim)] hover:bg-white/10 hover:text-[var(--board-text)]"
+          >
+            מדריך ↗
+          </a>
+          <Link
+            href="/my"
+            className="rounded-lg px-3 py-1.5 text-sm font-medium text-[var(--board-dim)] hover:bg-white/10 hover:text-[var(--board-text)]"
+          >
+            השיבוצים שלי
+          </Link>
+        </div>
       </header>
 
       {cycles.length === 0 || !cycle ? (

@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { adminGetCycle } from "@/lib/queries";
+import { todayInIsrael } from "@/lib/time";
 import { RunConsole, type RunSlot } from "./RunConsole";
 
 export const dynamic = "force-dynamic";
@@ -31,6 +32,7 @@ export default async function RunPage({
       cycleId={data.cycle.id}
       cycleName={data.cycle.name}
       eventDate={data.cycle.eventDate}
+      isToday={data.cycle.eventDate === todayInIsrael()}
       slots={slots}
     />
   );

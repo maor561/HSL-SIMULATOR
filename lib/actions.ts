@@ -22,7 +22,7 @@ import {
   destroySession,
   requireAdmin,
 } from "./auth";
-import { addMinutes, diffMinutes, israelLocalToUtc } from "./time";
+import { addMinutes, diffMinutes, israelLocalToUtc, nowOnDate } from "./time";
 
 export type FormState = {
   ok?: boolean;
@@ -125,16 +125,21 @@ export async function bookSlot(_prev: FormState, formData: FormData): Promise<Fo
     }
   }
 
-  // הכנסה אטומית עם בדיקת קיבולת בשאילתה אחת
+  // הכנסה אטומית: נועלים את שורת החלון (FOR UPDATE), סופרים ומכניסים בשאילתה אחת.
+  // בקשות מקבילות לאותו חלון מסתדרות בתור על הנעילה — אין חריגה מהקיבולת.
   let inserted: { id: string }[] = [];
   try {
     const res = await db.execute<{ id: string }>(sql`
+      with locked as (
+        select id, capacity from ${slots} where id = ${slotId} for update
+      )
       insert into ${bookings} (slot_id, cycle_id, kind, full_name, phone, phone_display, status)
       select ${slotId}, ${slot.cycleId}, ${slot.kind}, ${fullName}, ${phone}, ${raw.phone.trim()}, 'active'
+      from locked
       where (
         select count(*) from ${bookings}
         where slot_id = ${slotId} and status = 'active'
-      ) < ${slot.capacity}
+      ) < locked.capacity
       returning id
     `);
     inserted = Array.isArray(res)
@@ -513,7 +518,11 @@ export async function startSlot(formData: FormData): Promise<void> {
   await requireAdmin();
   const slotId = String(formData.get("slotId") ?? "");
   const cycleId = String(formData.get("cycleId") ?? "");
-  const now = new Date();
+
+  const [cycle] = await db.select().from(cycles).where(eq(cycles.id, cycleId));
+  if (!cycle) return;
+  // "עכשיו" מקובע לתאריך המחזור — לא מזיז את החלונות ליום אחר
+  const now = nowOnDate(cycle.eventDate);
 
   const list = await db
     .select()
@@ -537,7 +546,10 @@ export async function finishSlot(formData: FormData): Promise<void> {
   await requireAdmin();
   const slotId = String(formData.get("slotId") ?? "");
   const cycleId = String(formData.get("cycleId") ?? "");
-  const now = new Date();
+
+  const [cycle] = await db.select().from(cycles).where(eq(cycles.id, cycleId));
+  if (!cycle) return;
+  const now = nowOnDate(cycle.eventDate);
 
   const list = await db
     .select()
