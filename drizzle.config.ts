@@ -8,7 +8,8 @@ export default defineConfig({
   out: "./drizzle",
   dialect: "postgresql",
   dbCredentials: {
-    url: process.env.DATABASE_URL!,
+    // ל-DDL עדיף חיבור ישיר (ללא pgbouncer); נופל חזרה למאגר אם אין
+    url: process.env.DATABASE_URL_UNPOOLED ?? process.env.DATABASE_URL!,
   },
   strict: true,
   verbose: true,
