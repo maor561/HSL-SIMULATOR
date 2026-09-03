@@ -34,16 +34,20 @@ export type FormState = {
   values?: Record<string, string>;
 };
 
-/** מזהה הפרת אינדקס ייחודי (23505) גם כשהשגיאה עטופה ב-DrizzleQueryError */
-function isUniqueViolation(err: unknown): boolean {
+/** מאחד את טקסט השגיאה לאורך שרשרת ה-cause (DrizzleQueryError עוטף את שגיאת pg) */
+function errBlob(err: unknown): string {
   let cur = err as { code?: string; constraint?: string; message?: string; cause?: unknown } | undefined;
+  const parts: string[] = [];
   for (let i = 0; i < 6 && cur; i++) {
-    if (cur.code === "23505") return true;
-    const s = `${cur.constraint ?? ""} ${cur.message ?? ""}`;
-    if (s.includes("bookings_slot_phone_active_idx") || s.includes("duplicate key")) return true;
+    parts.push(cur.code ?? "", cur.constraint ?? "", cur.message ?? "");
     cur = cur.cause as typeof cur;
   }
-  return false;
+  return parts.join(" ");
+}
+
+function isUniqueViolation(err: unknown): boolean {
+  const s = errBlob(err);
+  return s.includes("23505") || s.includes("duplicate key");
 }
 
 function zodErrors(e: import("zod").ZodError): Record<string, string> {
@@ -75,6 +79,28 @@ export async function bookSlot(_prev: FormState, formData: FormData): Promise<Fo
   if (slot.endsAt.getTime() < Date.now())
     return { error: "החלון כבר עבר", values: raw };
 
+  // כל אדם — שיבוץ תדריך אחד ושיבוץ סימולטור אחד בלבד (בכל המערכת)
+  const [existingOfKind] = await db
+    .select({ id: bookings.id })
+    .from(bookings)
+    .where(
+      and(
+        eq(bookings.phone, phone),
+        eq(bookings.kind, slot.kind),
+        eq(bookings.status, "active"),
+      ),
+    )
+    .limit(1);
+  if (existingOfKind) {
+    return {
+      error:
+        slot.kind === "briefing"
+          ? "כבר קיים שיבוץ לתדריך עם מספר הטלפון הזה. יש לבטל אותו דרך «השיבוצים שלי» לפני הרשמה מחדש."
+          : "כבר קיים שיבוץ לסבב סימולטור עם מספר הטלפון הזה. יש לבטל אותו דרך «השיבוצים שלי» לפני הרשמה מחדש.",
+      values: raw,
+    };
+  }
+
   // תדריך הוא תנאי מקדים לסימולטור — באותו מחזור
   if (slot.kind === "sim") {
     const ok = await hasActiveBriefing(slot.cycleId, phone);
@@ -104,7 +130,13 @@ export async function bookSlot(_prev: FormState, formData: FormData): Promise<Fo
       : ((res as { rows?: { id: string }[] }).rows ?? []);
   } catch (err: unknown) {
     if (isUniqueViolation(err)) {
-      return { error: "מספר הטלפון הזה כבר משובץ לחלון הזה", values: raw };
+      const s = errBlob(err);
+      const msg = s.includes("one_briefing")
+        ? "כבר קיים שיבוץ לתדריך עם מספר הטלפון הזה."
+        : s.includes("one_sim")
+          ? "כבר קיים שיבוץ לסבב סימולטור עם מספר הטלפון הזה."
+          : "מספר הטלפון הזה כבר משובץ לחלון הזה.";
+      return { error: msg, values: raw };
     }
     throw err;
   }

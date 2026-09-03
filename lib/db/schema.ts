@@ -76,6 +76,14 @@ export const bookings = pgTable(
     uniqueIndex("bookings_slot_phone_active_idx")
       .on(t.slotId, t.phone)
       .where(sql`status = 'active'`),
+    // כל אדם — שיבוץ תדריך פעיל אחד בלבד בכל המערכת
+    uniqueIndex("bookings_phone_one_briefing_idx")
+      .on(t.phone)
+      .where(sql`kind = 'briefing' and status = 'active'`),
+    // כל אדם — שיבוץ סימולטור פעיל אחד בלבד בכל המערכת
+    uniqueIndex("bookings_phone_one_sim_idx")
+      .on(t.phone)
+      .where(sql`kind = 'sim' and status = 'active'`),
     index("bookings_cycle_phone_idx").on(t.cycleId, t.phone),
     index("bookings_phone_idx").on(t.phone),
   ],

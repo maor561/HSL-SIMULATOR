@@ -1,16 +1,17 @@
 /**
  * סימולציה: ממלא שיבוצים (אנשים) לכל המחזורים במסד.
- * מנקה שיבוצים קיימים בכל מחזור ואז מייצר חדשים —
- * תדריך מלא כמעט, וזוגות סימולטור מתוך אותו תדריך (שומר על תנאי המקדים).
+ * כלל: כל אדם נרשם לתדריך אחד בלבד ולסבב סימולטור אחד בלבד (בכל המערכת).
+ * מנקה את כל השיבוצים ואז מייצר חדשים — תדריך מלא כמעט, וזוגות סימולטור
+ * מתוך אותו תדריך, עם גיוון: חלונות מלאים / עם אדם אחד / ריקים.
  *
  *   npm run db:simulate
  */
 import { config } from "dotenv";
 config({ path: ".env.local" });
 
-import { eq } from "drizzle-orm";
 import { db } from "../lib/db";
 import { bookings, cycles, slots } from "../lib/db/schema";
+import { eq } from "drizzle-orm";
 
 const FIRST = [
   "אבי", "נועה", "יוסי", "דנה", "רון", "מיכל", "איתי", "שירה", "עומר", "טל",
@@ -22,12 +23,8 @@ const LAST = [
   "גבאי", "שרון", "בר", "אדרי", "חדד", "נחום", "אוחיון", "טל", "רוזן", "שפירא",
 ];
 
-function rint(a: number, b: number) {
-  return a + Math.floor(Math.random() * (b - a + 1));
-}
-function pick<T>(arr: T[]): T {
-  return arr[Math.floor(Math.random() * arr.length)];
-}
+const rint = (a: number, b: number) => a + Math.floor(Math.random() * (b - a + 1));
+const pick = <T,>(arr: T[]): T => arr[Math.floor(Math.random() * arr.length)];
 function shuffle<T>(arr: T[]): T[] {
   const a = [...arr];
   for (let i = a.length - 1; i > 0; i--) {
@@ -38,17 +35,16 @@ function shuffle<T>(arr: T[]): T[] {
 }
 
 type Person = { name: string; phone: string; display: string };
+const usedPhones = new Set<string>(); // ייחודי בכל המערכת
 
 function makePeople(n: number): Person[] {
-  const seen = new Set<string>();
   const out: Person[] = [];
   while (out.length < n) {
-    const name = `${pick(FIRST)} ${pick(LAST)}`;
     const digits = `05${pick(["0", "2", "3", "4", "8"])}${String(rint(1000000, 9999999))}`;
-    if (seen.has(digits)) continue;
-    seen.add(digits);
+    if (usedPhones.has(digits)) continue;
+    usedPhones.add(digits);
     out.push({
-      name,
+      name: `${pick(FIRST)} ${pick(LAST)}`,
       phone: digits,
       display: `${digits.slice(0, 3)}-${digits.slice(3, 6)}-${digits.slice(6)}`,
     });
@@ -73,68 +69,47 @@ async function main() {
       console.log(`— ${c.name}: אין חלונות, מדלג`);
       continue;
     }
-
-    // ניקוי שיבוצים קיימים במחזור
     await db.delete(bookings).where(eq(bookings.cycleId, c.id));
 
     const briefings = cSlots.filter((s) => s.kind === "briefing");
     const sims = cSlots.filter((s) => s.kind === "sim");
-
-    // מאגר אנשים למחזור — מספיק לתדריכים
-    const poolSize = Math.max(...briefings.map((b) => b.capacity), 10);
-    const pool = makePeople(poolSize + 4);
+    const cap = Math.max(...briefings.map((b) => b.capacity), 10);
+    const people = makePeople(cap);
 
     const rows: (typeof bookings.$inferInsert)[] = [];
-    const briefedPhones = new Set<string>();
 
-    // תדריך: ממלא ~70%-100% מהקיבולת
+    // תדריך — ~70%-100% מהקיבולת; כל אדם לתדריך אחד
+    const briefedPool: Person[] = [];
     for (const b of briefings) {
-      const take = rint(Math.ceil(b.capacity * 0.7), b.capacity);
-      for (const p of shuffle(pool).slice(0, take)) {
-        rows.push({
-          slotId: b.id,
-          cycleId: c.id,
-          kind: "briefing",
-          fullName: p.name,
-          phone: p.phone,
-          phoneDisplay: p.display,
-        });
-        briefedPhones.add(p.phone);
+      const take = rint(Math.ceil(b.capacity * 0.7), Math.min(b.capacity, people.length));
+      for (const p of shuffle(people).slice(0, take)) {
+        rows.push({ slotId: b.id, cycleId: c.id, kind: "briefing", fullName: p.name, phone: p.phone, phoneDisplay: p.display });
+        briefedPool.push(p);
       }
     }
 
-    const briefed = pool.filter((p) => briefedPhones.has(p.phone));
-
-    // סימולטור: זוגות מתוך מי שהיה בתדריך, עם גיוון מכוון —
-    // רוב החלונות מלאים (2), חלק עם אדם אחד (1), חלק ריקים (0).
-    const targetFor = () => {
-      const r = Math.random();
-      if (r < 0.55) return 2; // זוג מלא
-      if (r < 0.8) return 1; // אדם בודד
-      return 0; // חלון ריק
-    };
+    // סימולטור — כל אדם לסבב אחד לכל היותר. גיוון: מלא (2) / בודד (1) / ריק (0).
+    const queue = shuffle(briefedPool);
+    let full = 0,
+      solo = 0,
+      empty = 0;
     for (const s of sims) {
-      const target = Math.min(targetFor(), s.capacity);
-      for (const p of shuffle(briefed).slice(0, target)) {
-        rows.push({
-          slotId: s.id,
-          cycleId: c.id,
-          kind: "sim",
-          fullName: p.name,
-          phone: p.phone,
-          phoneDisplay: p.display,
-        });
+      const r = Math.random();
+      let target = r < 0.55 ? 2 : r < 0.8 ? 1 : 0;
+      target = Math.min(target, s.capacity, queue.length);
+      for (let i = 0; i < target; i++) {
+        const p = queue.shift()!;
+        rows.push({ slotId: s.id, cycleId: c.id, kind: "sim", fullName: p.name, phone: p.phone, phoneDisplay: p.display });
       }
+      if (target >= 2) full++;
+      else if (target === 1) solo++;
+      else empty++;
     }
 
-    if (rows.length) await db.insert(bookings).values(rows);
-    const simRows = rows.filter((r) => r.kind === "sim").length;
-    const simFull = sims.filter((s) => rows.filter((r) => r.slotId === s.id).length >= 2).length;
-    const simSolo = sims.filter((s) => rows.filter((r) => r.slotId === s.id).length === 1).length;
-    const simEmpty = sims.length - simFull - simSolo;
+    await db.insert(bookings).values(rows);
     console.log(
-      `✓ ${c.name} (${c.eventDate}) — תדריך ${briefedPhones.size} · סימולטור ${simRows} ` +
-        `(${simFull} מלאים, ${simSolo} בודדים, ${simEmpty} ריקים)`,
+      `✓ ${c.name} (${c.eventDate}) — תדריך ${briefedPool.length} · סימולטור ${rows.length - briefedPool.length} ` +
+        `(${full} מלאים, ${solo} בודדים, ${empty} ריקים)`,
     );
   }
 
