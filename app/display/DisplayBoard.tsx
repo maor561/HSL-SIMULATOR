@@ -32,15 +32,18 @@ const TERM = { briefing: "תדריך", sim: "טיסה" } as const;
 
 type Status = { key: "done" | "now" | "boarding" | "soon"; label: string; cls: string };
 function statusOf(s: FeedSlot, now: number): Status {
+  // כשהחלון פעיל/קרוב — הסטטוס הוא סוג החלון עצמו
+  const activeLabel = s.kind === "briefing" ? "תדריך" : "בטיסה";
   if (s.actualEndAt) return { key: "done", label: "הסתיים", cls: "text-[var(--board-dim)]" };
   if (s.actualStartAt)
-    return { key: "now", label: "בטיסה", cls: "text-[var(--board-green)] board-blink" };
+    return { key: "now", label: activeLabel, cls: "text-[var(--board-green)] board-blink" };
   const start = new Date(s.startsAt).getTime();
   const end = new Date(s.endsAt).getTime();
   if (now >= end) return { key: "done", label: "הסתיים", cls: "text-[var(--board-dim)]" };
-  if (now >= start) return { key: "now", label: "עכשיו", cls: "text-[var(--board-green)] board-blink" };
+  if (now >= start)
+    return { key: "now", label: activeLabel, cls: "text-[var(--board-green)] board-blink" };
   const mins = Math.ceil((start - now) / 60_000);
-  if (mins <= 15) return { key: "boarding", label: "בטיסה", cls: "text-[var(--board-amber)]" };
+  if (mins <= 15) return { key: "boarding", label: activeLabel, cls: "text-[var(--board-amber)]" };
   let label: string;
   if (mins >= 24 * 60) {
     const days = Math.round(mins / (24 * 60));
