@@ -2,7 +2,7 @@ import { getDisplayCycles } from "@/lib/queries";
 import { DisplayBoard, type Feed } from "./DisplayBoard";
 
 export const dynamic = "force-dynamic";
-export const metadata = { title: "מסך הקרנה · תורים לסימולטור" };
+export const metadata = { title: "לוח טיסות · סימולטור A320" };
 
 export default async function DisplayPage() {
   const cycles = (await getDisplayCycles()).map((c) => ({

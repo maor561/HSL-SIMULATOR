@@ -217,7 +217,7 @@ export function DisplayBoard({ initial }: { initial: Feed }) {
         {/* כותרת + שעון */}
         <header className="flex items-start justify-between border-b-2 border-[var(--board-line)] pb-4">
           <div>
-            <div className="text-[42px] font-extrabold tracking-wide">לוח תורים · סימולטור A320</div>
+            <div className="text-[42px] font-extrabold tracking-wide">לוח טיסות · סימולטור A320</div>
             <div className="mt-1 text-[22px] text-[var(--board-dim)]">{dateFmt.format(new Date())}</div>
           </div>
           <div className="flex items-center gap-6">
