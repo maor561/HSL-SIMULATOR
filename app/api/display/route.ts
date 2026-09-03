@@ -1,26 +1,29 @@
 import { NextResponse } from "next/server";
-import { getDisplayQueue } from "@/lib/queries";
+import { getDisplayCycles } from "@/lib/queries";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
 export async function GET() {
-  const queue = await getDisplayQueue();
-  const items = queue
-    .map((s) => ({
-      slotId: s.slotId,
-      kind: s.kind,
-      label: s.label,
-      cycleName: s.cycleName,
-      startsAt: s.startsAt.toISOString(),
-      endsAt: s.endsAt.toISOString(),
-      capacity: s.capacity,
-      names: s.names,
-    }))
-    .sort((a, b) => a.startsAt.localeCompare(b.startsAt));
+  const cycles = (await getDisplayCycles()).map((c) => ({
+    id: c.id,
+    name: c.name,
+    eventDate: c.eventDate,
+    slots: c.slots
+      .map((s) => ({
+        slotId: s.slotId,
+        kind: s.kind,
+        label: s.label,
+        startsAt: s.startsAt.toISOString(),
+        endsAt: s.endsAt.toISOString(),
+        capacity: s.capacity,
+        names: s.names,
+      }))
+      .sort((a, b) => a.startsAt.localeCompare(b.startsAt)),
+  }));
 
   return NextResponse.json(
-    { now: new Date().toISOString(), items },
+    { now: new Date().toISOString(), cycles },
     { headers: { "cache-control": "no-store" } },
   );
 }

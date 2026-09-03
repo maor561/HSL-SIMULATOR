@@ -1,5 +1,5 @@
 import "server-only";
-import { and, asc, desc, eq, gte, sql } from "drizzle-orm";
+import { and, asc, desc, eq, sql } from "drizzle-orm";
 import { db } from "./db";
 import { bookings, cycles, slots } from "./db/schema";
 
@@ -108,60 +108,68 @@ export async function getBookingsByPhone(phone: string) {
     .orderBy(asc(slots.startsAt));
 }
 
-/** תור להקרנה — כל השיבוצים הפעילים מעכשיו והלאה, מקובצים לפי חלון */
-export async function getDisplayQueue(fromMsAgo = 30 * 60_000) {
-  const from = new Date(Date.now() - fromMsAgo);
+export type DisplaySlot = {
+  slotId: string;
+  kind: "briefing" | "sim";
+  label: string | null;
+  startsAt: Date;
+  endsAt: Date;
+  capacity: number;
+  names: string[];
+};
+export type DisplayCycle = {
+  id: string;
+  name: string;
+  eventDate: string;
+  slots: DisplaySlot[];
+};
+
+/** להקרנה — כל המחזורים המפורסמים עם החלונות והשמות, מקובצים לניווט במסך */
+export async function getDisplayCycles(): Promise<DisplayCycle[]> {
   const rows = await db
     .select({
+      cycleId: cycles.id,
+      cycleName: cycles.name,
+      eventDate: cycles.eventDate,
       slotId: slots.id,
       kind: slots.kind,
       label: slots.label,
       startsAt: slots.startsAt,
       endsAt: slots.endsAt,
       capacity: slots.capacity,
-      cycleName: cycles.name,
       bookingName: bookings.fullName,
     })
-    .from(slots)
-    .innerJoin(cycles, eq(slots.cycleId, cycles.id))
-    .leftJoin(
-      bookings,
-      and(eq(bookings.slotId, slots.id), eq(bookings.status, "active")),
-    )
-    .where(and(eq(cycles.isPublished, true), gte(slots.endsAt, from)))
-    .orderBy(asc(slots.startsAt), asc(bookings.createdAt));
+    .from(cycles)
+    .innerJoin(slots, eq(slots.cycleId, cycles.id))
+    .leftJoin(bookings, and(eq(bookings.slotId, slots.id), eq(bookings.status, "active")))
+    .where(eq(cycles.isPublished, true))
+    .orderBy(asc(cycles.eventDate), asc(slots.startsAt), asc(bookings.createdAt));
 
-  const map = new Map<
-    string,
-    {
-      slotId: string;
-      kind: "briefing" | "sim";
-      label: string | null;
-      startsAt: Date;
-      endsAt: Date;
-      capacity: number;
-      cycleName: string;
-      names: string[];
-    }
-  >();
+  const cyMap = new Map<string, DisplayCycle>();
+  const slMap = new Map<string, DisplaySlot>();
   for (const r of rows) {
-    let g = map.get(r.slotId);
-    if (!g) {
-      g = {
+    let cy = cyMap.get(r.cycleId);
+    if (!cy) {
+      cy = { id: r.cycleId, name: r.cycleName, eventDate: r.eventDate, slots: [] };
+      cyMap.set(r.cycleId, cy);
+    }
+    let sl = slMap.get(r.slotId);
+    if (!sl) {
+      sl = {
         slotId: r.slotId,
         kind: r.kind,
         label: r.label,
         startsAt: r.startsAt,
         endsAt: r.endsAt,
         capacity: r.capacity,
-        cycleName: r.cycleName,
         names: [],
       };
-      map.set(r.slotId, g);
+      slMap.set(r.slotId, sl);
+      cy.slots.push(sl);
     }
-    if (r.bookingName) g.names.push(r.bookingName);
+    if (r.bookingName) sl.names.push(r.bookingName);
   }
-  return [...map.values()];
+  return [...cyMap.values()];
 }
 
 /* ---------- אדמין ---------- */
