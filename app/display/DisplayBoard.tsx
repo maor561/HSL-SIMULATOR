@@ -34,7 +34,7 @@ type Status = { key: "done" | "now" | "boarding" | "soon"; label: string; cls: s
 function statusOf(s: FeedSlot, now: number): Status {
   if (s.actualEndAt) return { key: "done", label: "הסתיים", cls: "text-[var(--board-dim)]" };
   if (s.actualStartAt)
-    return { key: "now", label: "התחיל", cls: "text-[var(--board-green)] board-blink" };
+    return { key: "now", label: "בטיסה", cls: "text-[var(--board-green)] board-blink" };
   const start = new Date(s.startsAt).getTime();
   const end = new Date(s.endsAt).getTime();
   if (now >= end) return { key: "done", label: "הסתיים", cls: "text-[var(--board-dim)]" };

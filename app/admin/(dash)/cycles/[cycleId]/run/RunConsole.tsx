@@ -85,7 +85,7 @@ function SlotRow({ s, cycleId, now }: { s: RunSlot; cycleId: string; now: number
     );
   } else if (started) {
     const over = now > plannedEnd ? mins(now - plannedEnd) : 0;
-    pill = { text: "התחיל", cls: "bg-emerald-500/20 text-emerald-300 board-blink" };
+    pill = { text: "בטיסה", cls: "bg-emerald-500/20 text-emerald-300 board-blink" };
     sub = (
       <span className="text-emerald-300/90">
         התחיל {T(s.actualStartAt!)} · רץ {mins(now - new Date(s.actualStartAt!).getTime())} דק׳
