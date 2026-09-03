@@ -31,6 +31,18 @@ export type FormState = {
   values?: Record<string, string>;
 };
 
+/** מזהה הפרת אינדקס ייחודי (23505) גם כשהשגיאה עטופה ב-DrizzleQueryError */
+function isUniqueViolation(err: unknown): boolean {
+  let cur = err as { code?: string; constraint?: string; message?: string; cause?: unknown } | undefined;
+  for (let i = 0; i < 6 && cur; i++) {
+    if (cur.code === "23505") return true;
+    const s = `${cur.constraint ?? ""} ${cur.message ?? ""}`;
+    if (s.includes("bookings_slot_phone_active_idx") || s.includes("duplicate key")) return true;
+    cur = cur.cause as typeof cur;
+  }
+  return false;
+}
+
 function zodErrors(e: import("zod").ZodError): Record<string, string> {
   const out: Record<string, string> = {};
   for (const issue of e.issues) {
@@ -88,8 +100,7 @@ export async function bookSlot(_prev: FormState, formData: FormData): Promise<Fo
       ? (res as { id: string }[])
       : ((res as { rows?: { id: string }[] }).rows ?? []);
   } catch (err: unknown) {
-    const msg = String((err as Error)?.message ?? "");
-    if (msg.includes("bookings_slot_phone_active_idx") || msg.includes("duplicate key")) {
+    if (isUniqueViolation(err)) {
       return { error: "מספר הטלפון הזה כבר משובץ לחלון הזה", values: raw };
     }
     throw err;
