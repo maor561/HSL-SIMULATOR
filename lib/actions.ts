@@ -101,13 +101,25 @@ export async function bookSlot(_prev: FormState, formData: FormData): Promise<Fo
     };
   }
 
-  // תדריך הוא תנאי מקדים לסימולטור — באותו מחזור
+  // חלון סימולטור אפשר לתפוס רק במחזור שבו נרשמת לתדריך
   if (slot.kind === "sim") {
-    const ok = await hasActiveBriefing(slot.cycleId, phone);
-    if (!ok) {
+    const sameCycle = await hasActiveBriefing(slot.cycleId, phone);
+    if (!sameCycle) {
+      const [anyBriefing] = await db
+        .select({ id: bookings.id })
+        .from(bookings)
+        .where(
+          and(
+            eq(bookings.phone, phone),
+            eq(bookings.kind, "briefing"),
+            eq(bookings.status, "active"),
+          ),
+        )
+        .limit(1);
       return {
-        error:
-          "כדי להשתבץ לסימולטור צריך קודם שיבוץ פעיל לתדריך באותו מחזור. יש להירשם לתדריך תחילה.",
+        error: anyBriefing
+          ? "אפשר לתפוס חלון סימולטור רק במחזור שבו נרשמת לתדריך. עברו למחזור של התדריך שלכם."
+          : "כדי לתפוס חלון סימולטור צריך קודם להירשם לתדריך של אותו מחזור.",
         values: raw,
       };
     }
