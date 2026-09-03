@@ -10,6 +10,9 @@ import {
   cancelInput,
   cycleInput,
   lookupInput,
+  quickCycleInput,
+  retimeCycleInput,
+  retimeSlotInput,
   slotInput,
 } from "./validation";
 import { hasActiveBriefing } from "./queries";
@@ -19,7 +22,7 @@ import {
   destroySession,
   requireAdmin,
 } from "./auth";
-import { israelLocalToUtc } from "./time";
+import { addMinutes, diffMinutes, israelLocalToUtc } from "./time";
 
 export type FormState = {
   ok?: boolean;
@@ -176,27 +179,152 @@ export async function adminLogout(): Promise<void> {
 
 /* ============ אדמין: מחזורים ============ */
 
+/**
+ * יוצר מחזור עם לוח זמנים דיפולטי: תדריך אחד ואחריו סבבי סימולטור ברצף,
+ * כשכל סבב מתחיל בדיוק כשקודמו מסתיים. האדמין צריך רק שם, תאריך ושעת התחלה.
+ */
 export async function createCycle(_prev: FormState, formData: FormData): Promise<FormState> {
   await requireAdmin();
   const raw = {
     name: String(formData.get("name") ?? ""),
     eventDate: String(formData.get("eventDate") ?? ""),
+    startTime: String(formData.get("startTime") ?? ""),
+    briefingMinutes: String(formData.get("briefingMinutes") ?? "45"),
+    briefingCapacity: String(formData.get("briefingCapacity") ?? "10"),
+    simCount: String(formData.get("simCount") ?? "5"),
+    simMinutes: String(formData.get("simMinutes") ?? "45"),
+    simCapacity: String(formData.get("simCapacity") ?? "2"),
     notes: String(formData.get("notes") ?? ""),
   };
-  const parsed = cycleInput.safeParse(raw);
+  const parsed = quickCycleInput.safeParse(raw);
   if (!parsed.success) {
     return { error: "יש לתקן את הפרטים", fieldErrors: zodErrors(parsed.error), values: raw };
   }
+  const d = parsed.data;
+
   const [row] = await db
     .insert(cycles)
-    .values({
-      name: parsed.data.name,
-      eventDate: parsed.data.eventDate,
-      notes: parsed.data.notes || null,
-    })
+    .values({ name: d.name, eventDate: d.eventDate, notes: d.notes || null })
     .returning();
+
+  let cursor = israelLocalToUtc(d.eventDate, d.startTime);
+  const rows: (typeof slots.$inferInsert)[] = [];
+
+  const briefEnd = addMinutes(cursor, d.briefingMinutes);
+  rows.push({
+    cycleId: row.id,
+    kind: "briefing",
+    startsAt: cursor,
+    endsAt: briefEnd,
+    capacity: d.briefingCapacity,
+  });
+  cursor = briefEnd;
+
+  for (let i = 1; i <= d.simCount; i++) {
+    const end = addMinutes(cursor, d.simMinutes);
+    rows.push({
+      cycleId: row.id,
+      kind: "sim",
+      label: `זוג ${i}`,
+      startsAt: cursor,
+      endsAt: end,
+      capacity: d.simCapacity,
+    });
+    cursor = end;
+  }
+
+  if (rows.length) await db.insert(slots).values(rows);
+
   revalidatePath("/admin");
   redirect(`/admin/cycles/${row.id}`);
+}
+
+/**
+ * דוחף את כל לוח הזמנים של מחזור: החלון הראשון מתחיל בשעה החדשה,
+ * וכל חלון עוקב מתחיל כשקודמו מסתיים — תוך שמירה על משך כל חלון והסדר.
+ */
+export async function retimeCycle(_prev: FormState, formData: FormData): Promise<FormState> {
+  await requireAdmin();
+  const raw = {
+    cycleId: String(formData.get("cycleId") ?? ""),
+    eventDate: String(formData.get("eventDate") ?? ""),
+    startTime: String(formData.get("startTime") ?? ""),
+  };
+  const parsed = retimeCycleInput.safeParse(raw);
+  if (!parsed.success) {
+    return { error: "יש לתקן את הפרטים", fieldErrors: zodErrors(parsed.error), values: raw };
+  }
+  const { cycleId, eventDate, startTime } = parsed.data;
+
+  const list = await db
+    .select()
+    .from(slots)
+    .where(eq(slots.cycleId, cycleId))
+    .orderBy(slots.startsAt);
+
+  let cursor = israelLocalToUtc(eventDate, startTime);
+  for (const s of list) {
+    const dur = Math.max(5, diffMinutes(s.startsAt, s.endsAt));
+    const end = addMinutes(cursor, dur);
+    await db.update(slots).set({ startsAt: cursor, endsAt: end }).where(eq(slots.id, s.id));
+    cursor = end;
+  }
+  await db.update(cycles).set({ eventDate }).where(eq(cycles.id, cycleId));
+
+  revalidatePath("/admin");
+  revalidatePath(`/admin/cycles/${cycleId}`);
+  revalidatePath("/");
+  revalidatePath("/display");
+  return { ok: true };
+}
+
+/** מעדכן חלון בודד (שעת התחלה + משך). אם cascade=1 — דוחף את כל החלונות שאחריו. */
+export async function retimeSlot(_prev: FormState, formData: FormData): Promise<FormState> {
+  await requireAdmin();
+  const raw = {
+    slotId: String(formData.get("slotId") ?? ""),
+    cycleId: String(formData.get("cycleId") ?? ""),
+    startTime: String(formData.get("startTime") ?? ""),
+    minutes: String(formData.get("minutes") ?? ""),
+    cascade: String(formData.get("cascade") ?? "1"),
+  };
+  const parsed = retimeSlotInput.safeParse(raw);
+  if (!parsed.success) {
+    return { error: "יש לתקן את הפרטים", fieldErrors: zodErrors(parsed.error) };
+  }
+  const { slotId, cycleId, startTime, minutes, cascade } = parsed.data;
+
+  const [cycle] = await db.select().from(cycles).where(eq(cycles.id, cycleId));
+  if (!cycle) return { error: "המחזור לא נמצא" };
+
+  const list = await db
+    .select()
+    .from(slots)
+    .where(eq(slots.cycleId, cycleId))
+    .orderBy(slots.startsAt);
+
+  const idx = list.findIndex((s) => s.id === slotId);
+  if (idx < 0) return { error: "החלון לא נמצא" };
+
+  let cursor = israelLocalToUtc(cycle.eventDate, startTime);
+  const end = addMinutes(cursor, minutes);
+  await db.update(slots).set({ startsAt: cursor, endsAt: end }).where(eq(slots.id, slotId));
+  cursor = end;
+
+  if (cascade === "1") {
+    for (const s of list.slice(idx + 1)) {
+      const dur = Math.max(5, diffMinutes(s.startsAt, s.endsAt));
+      const e = addMinutes(cursor, dur);
+      await db.update(slots).set({ startsAt: cursor, endsAt: e }).where(eq(slots.id, s.id));
+      cursor = e;
+    }
+  }
+
+  revalidatePath("/admin");
+  revalidatePath(`/admin/cycles/${cycleId}`);
+  revalidatePath("/");
+  revalidatePath("/display");
+  return { ok: true };
 }
 
 export async function updateCycle(_prev: FormState, formData: FormData): Promise<FormState> {

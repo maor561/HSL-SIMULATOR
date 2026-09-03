@@ -10,7 +10,9 @@ import {
 } from "@/lib/actions";
 import { AddSlotForm } from "./AddSlotForm";
 import { EditCycleForm } from "./EditCycleForm";
-import { fmtDate, fmtRange, fmtWeekday } from "@/lib/time";
+import { RetimeCycleForm } from "./RetimeCycleForm";
+import { SlotRetime } from "./SlotRetime";
+import { diffMinutes, fmtDate, fmtRange, fmtTime, fmtWeekday, utcToIsraelFields } from "@/lib/time";
 import type { SlotWithCount } from "@/lib/queries";
 
 export const dynamic = "force-dynamic";
@@ -20,6 +22,8 @@ async function SlotBlock({ slot }: { slot: SlotWithCount }) {
   const active = bookings.filter((b) => b.status === "active");
   const pct = Math.round((active.length / slot.capacity) * 100);
   const full = active.length >= slot.capacity;
+  const { time } = utcToIsraelFields(slot.startsAt);
+  const minutes = Math.max(5, diffMinutes(slot.startsAt, slot.endsAt));
 
   return (
     <div className="a-card p-4">
@@ -27,6 +31,7 @@ async function SlotBlock({ slot }: { slot: SlotWithCount }) {
         <div>
           <div className="font-bold tabular-nums text-slate-900">
             {fmtRange(slot.startsAt, slot.endsAt)}
+            <span className="ms-2 text-xs font-normal text-slate-400">{minutes} דק׳</span>
             {slot.label ? <span className="font-normal text-slate-500"> · {slot.label}</span> : null}
           </div>
           <div className="mt-1 w-44">
@@ -55,6 +60,10 @@ async function SlotBlock({ slot }: { slot: SlotWithCount }) {
             </button>
           </form>
         </div>
+      </div>
+
+      <div className="mt-3 border-t border-slate-100 pt-3">
+        <SlotRetime slotId={slot.id} cycleId={slot.cycleId} startTime={time} minutes={minutes} />
       </div>
 
       {active.length > 0 ? (
@@ -100,6 +109,7 @@ export default async function CyclePage({
   const { cycle, slots } = data;
   const briefings = slots.filter((s) => s.kind === "briefing");
   const sims = slots.filter((s) => s.kind === "sim");
+  const firstStart = slots.length ? utcToIsraelFields(slots[0].startsAt).time : "09:00";
 
   return (
     <div className="space-y-8">
@@ -141,6 +151,41 @@ export default async function CyclePage({
         </div>
       </div>
 
+      {/* לוח זמנים — דחיפת כל הרצף */}
+      <section className="a-card p-4">
+        <h2 className="text-sm font-bold text-slate-700">לוח זמנים</h2>
+        <p className="mt-0.5 text-xs text-slate-500">
+          שינוי שעת ההתחלה מזיז את כל החלונות ברצף, תוך שמירה על משך כל חלון והסדר.
+        </p>
+        <div className="mt-3">
+          <RetimeCycleForm cycleId={cycle.id} eventDate={cycle.eventDate} startTime={firstStart} />
+        </div>
+        {slots.length > 0 ? (
+          <ol className="mt-4 space-y-1 border-t border-slate-100 pt-3 text-sm">
+            {slots.map((s) => (
+              <li key={s.id} className="flex items-center gap-3">
+                <span className="w-24 font-mono tabular-nums text-slate-800">
+                  {fmtTime(s.startsAt)}–{fmtTime(s.endsAt)}
+                </span>
+                <span
+                  className={`rounded px-1.5 py-0.5 text-[11px] font-bold ${
+                    s.kind === "briefing"
+                      ? "bg-brand/10 text-brand"
+                      : "bg-slate-100 text-slate-600"
+                  }`}
+                >
+                  {s.kind === "briefing" ? "תדריך" : "סימולטור"}
+                </span>
+                <span className="text-xs text-slate-400">
+                  {Math.max(5, diffMinutes(s.startsAt, s.endsAt))} דק׳ · {s.capacity} מקומות
+                  {s.label ? ` · ${s.label}` : ""}
+                </span>
+              </li>
+            ))}
+          </ol>
+        ) : null}
+      </section>
+
       <section className="a-card p-4">
         <h2 className="mb-3 text-sm font-bold text-slate-700">פרטי מחזור</h2>
         <EditCycleForm
@@ -151,11 +196,6 @@ export default async function CyclePage({
         />
       </section>
 
-      <section className="a-card p-4">
-        <h2 className="mb-3 text-sm font-bold text-slate-700">הוספת חלון זמן</h2>
-        <AddSlotForm cycleId={cycle.id} defaultDate={cycle.eventDate} />
-      </section>
-
       <section>
         <h2 className="mb-3 flex items-center gap-2 text-lg font-extrabold text-slate-900">
           תדריך והסבר תאורטי
@@ -164,7 +204,7 @@ export default async function CyclePage({
           </span>
         </h2>
         {briefings.length === 0 ? (
-          <p className="text-sm text-slate-400">אין חלונות תדריך. הוסיפו למעלה (סוג: תדריך).</p>
+          <p className="text-sm text-slate-400">אין חלונות תדריך.</p>
         ) : (
           <div className="space-y-3">
             {briefings.map((s) => (
@@ -182,7 +222,7 @@ export default async function CyclePage({
           </span>
         </h2>
         {sims.length === 0 ? (
-          <p className="text-sm text-slate-400">אין חלונות סימולטור. הוסיפו למעלה (סוג: סימולטור).</p>
+          <p className="text-sm text-slate-400">אין חלונות סימולטור.</p>
         ) : (
           <div className="space-y-3">
             {sims.map((s) => (
@@ -190,6 +230,11 @@ export default async function CyclePage({
             ))}
           </div>
         )}
+      </section>
+
+      <section className="a-card p-4">
+        <h2 className="mb-3 text-sm font-bold text-slate-700">הוספת חלון ידני</h2>
+        <AddSlotForm cycleId={cycle.id} defaultDate={cycle.eventDate} />
       </section>
 
       <section className="rounded-2xl border border-rose-200 bg-rose-50 p-4">

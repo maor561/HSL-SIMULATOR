@@ -45,6 +45,38 @@ export const cycleInput = z.object({
   notes: z.string().trim().max(500).optional().or(z.literal("")),
 });
 
+const hhmm = z.string().regex(/^\d{2}:\d{2}$/, "שעה לא תקינה");
+const dateStr = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "תאריך לא תקין");
+
+/** יצירת מחזור עם לוח זמנים דיפולטי: תדריך אחד + כמה סבבי סימולטור ברצף */
+export const quickCycleInput = z.object({
+  name: z.string().trim().min(2, "נא להזין שם מחזור").max(80),
+  eventDate: dateStr,
+  startTime: hhmm,
+  briefingMinutes: z.coerce.number().int().min(5).max(240).default(45),
+  briefingCapacity: z.coerce.number().int().min(1).max(50).default(10),
+  simCount: z.coerce.number().int().min(0).max(20).default(5),
+  simMinutes: z.coerce.number().int().min(5).max(240).default(45),
+  simCapacity: z.coerce.number().int().min(1).max(20).default(2),
+  notes: z.string().trim().max(500).optional().or(z.literal("")),
+});
+
+/** דחיפת כל לוח הזמנים של מחזור משעת התחלה חדשה */
+export const retimeCycleInput = z.object({
+  cycleId: z.string().uuid(),
+  eventDate: dateStr,
+  startTime: hhmm,
+});
+
+/** עדכון חלון בודד + דחיפת החלונות שאחריו */
+export const retimeSlotInput = z.object({
+  slotId: z.string().uuid(),
+  cycleId: z.string().uuid(),
+  startTime: hhmm,
+  minutes: z.coerce.number().int().min(5).max(240),
+  cascade: z.enum(["0", "1"]).default("1"),
+});
+
 export const slotInput = z
   .object({
     cycleId: z.string().uuid(),

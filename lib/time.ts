@@ -9,6 +9,14 @@ export function isPast(d: Date | string): boolean {
   return new Date(d).getTime() < nowMs();
 }
 
+export function addMinutes(d: Date, minutes: number): Date {
+  return new Date(d.getTime() + minutes * 60_000);
+}
+
+export function diffMinutes(a: Date, b: Date): number {
+  return Math.round((b.getTime() - a.getTime()) / 60_000);
+}
+
 const timeFmt = new Intl.DateTimeFormat("he-IL", {
   timeZone: TZ,
   hour: "2-digit",
