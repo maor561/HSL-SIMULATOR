@@ -1,0 +1,63 @@
+@import "tailwindcss";
+
+@theme inline {
+  --font-sans: var(--font-heebo), ui-sans-serif, system-ui, sans-serif;
+}
+
+html {
+  color-scheme: light;
+}
+
+body {
+  font-family: var(--font-sans);
+}
+
+/* ===== מסך הקרנה (Departures board) ===== */
+.board {
+  --board-bg: #0b1220;
+  --board-panel: #101a2e;
+  --board-line: #1f2d47;
+  --board-amber: #ffb31a;
+  --board-green: #34d399;
+  --board-text: #e8eefc;
+  --board-dim: #8ea3c9;
+  background: var(--board-bg);
+  color: var(--board-text);
+  font-family: var(--font-sans);
+}
+
+.board-row {
+  border-bottom: 1px solid var(--board-line);
+}
+
+.board-flip {
+  animation: board-flip 0.5s ease;
+}
+
+@keyframes board-flip {
+  0% {
+    transform: rotateX(-90deg);
+    opacity: 0;
+  }
+  100% {
+    transform: rotateX(0);
+    opacity: 1;
+  }
+}
+
+.board-blink {
+  animation: board-blink 1.4s steps(1, end) infinite;
+}
+
+@keyframes board-blink {
+  50% {
+    opacity: 0.25;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .board-flip,
+  .board-blink {
+    animation: none;
+  }
+}
