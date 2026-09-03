@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { BookingForm } from "./BookingForm";
 import { PlaneMark } from "./PlaneMark";
-import { GUIDE_URL } from "@/lib/links";
+import { GUIDE_PATH } from "@/lib/links";
 
 export type RSlot = {
   id: string;
@@ -93,14 +93,12 @@ export function RegisterBoard({ cycles }: { cycles: RCycle[] }) {
           </div>
         </div>
         <div className="flex items-center gap-1">
-          <a
-            href={GUIDE_URL}
-            target="_blank"
-            rel="noopener noreferrer"
+          <Link
+            href={GUIDE_PATH}
             className="rounded-lg px-3 py-1.5 text-sm font-medium text-[var(--board-dim)] hover:bg-white/10 hover:text-[var(--board-text)]"
           >
-            מדריך ↗
-          </a>
+            מדריך
+          </Link>
           <Link
             href="/my"
             className="rounded-lg px-3 py-1.5 text-sm font-medium text-[var(--board-dim)] hover:bg-white/10 hover:text-[var(--board-text)]"

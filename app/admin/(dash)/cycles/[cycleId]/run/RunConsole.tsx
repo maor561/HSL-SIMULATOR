@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useFormStatus } from "react-dom";
-import { startSlot, finishSlot, resetSlotRun, nudgeFrom } from "@/lib/actions";
+import { startSlot, finishSlot, resetSlotRun, resetCycleRun, nudgeFrom } from "@/lib/actions";
 
 export type RunSlot = {
   id: string;
@@ -14,6 +14,7 @@ export type RunSlot = {
   endsAt: string;
   capacity: number;
   taken: number;
+  names: string[];
   actualStartAt: string | null;
   actualEndAt: string | null;
 };
@@ -121,6 +122,20 @@ function SlotRow({ s, cycleId, now }: { s: RunSlot; cycleId: string; now: number
           <div className="mt-1 text-sm">
             {sub ?? <span className="text-[var(--board-dim)]">מתוכנן · {s.taken}/{s.capacity} משובצים</span>}
           </div>
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {s.names.length ? (
+              s.names.map((n, i) => (
+                <span
+                  key={i}
+                  className="rounded-md bg-white/10 px-2 py-0.5 text-xs text-[var(--board-text)]"
+                >
+                  {n}
+                </span>
+              ))
+            ) : (
+              <span className="text-xs text-[var(--board-dim)]">אין שיבוצים</span>
+            )}
+          </div>
         </div>
         <span className={`shrink-0 rounded-lg px-3 py-1.5 text-sm font-bold ${pill.cls}`}>{pill.text}</span>
       </div>
@@ -211,6 +226,18 @@ export function RunConsole({
           </div>
         </div>
         <div className="flex items-center gap-3">
+          <form
+            action={resetCycleRun}
+            onSubmit={(e) => {
+              if (!confirm("לאפס את מצב ההפעלה? כל סימוני «התחיל/הסתיים» יימחקו והזמנים יחזרו ללוח נקי ורצוף על תאריך המחזור."))
+                e.preventDefault();
+            }}
+          >
+            <input type="hidden" name="cycleId" value={cycleId} />
+            <button className="rounded-lg border border-rose-400/40 px-3 py-2 text-sm font-semibold text-rose-300 hover:bg-rose-500/15">
+              ↺ איפוס הפעלה
+            </button>
+          </form>
           <Link
             href="/display"
             target="_blank"

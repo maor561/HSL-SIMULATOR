@@ -22,7 +22,13 @@ import {
   destroySession,
   requireAdmin,
 } from "./auth";
-import { addMinutes, diffMinutes, israelLocalToUtc, nowOnDate } from "./time";
+import {
+  addMinutes,
+  diffMinutes,
+  israelLocalToUtc,
+  nowOnDate,
+  utcToIsraelFields,
+} from "./time";
 
 export type FormState = {
   ok?: boolean;
@@ -499,7 +505,11 @@ function revalidateRun(cycleId: string) {
   revalidatePath("/my");
 }
 
-/** משרשר מחדש את משך החלונות מאינדקס נתון, החל מ-cursor */
+/**
+ * משרשר מחדש את משך החלונות מאינדקס נתון, החל מ-cursor.
+ * חלון שכבר סומן (התחיל/הסתיים) לא זז — התור פשוט ממשיך אחריו.
+ * כך אפשר להריץ חלונות בסדר חופשי (למשל טיסה לפני תדריך).
+ */
 async function reflowTail(
   list: (typeof slots.$inferSelect)[],
   fromIndex: number,
@@ -507,6 +517,10 @@ async function reflowTail(
 ) {
   for (const s of list.slice(fromIndex)) {
     const dur = Math.max(5, diffMinutes(s.startsAt, s.endsAt));
+    if (s.actualStartAt || s.actualEndAt) {
+      cursor = s.actualEndAt ?? addMinutes(s.actualStartAt as Date, dur);
+      continue;
+    }
     const end = addMinutes(cursor, dur);
     await db.update(slots).set({ startsAt: cursor, endsAt: end }).where(eq(slots.id, s.id));
     cursor = end;
@@ -606,6 +620,39 @@ export async function nudgeFrom(formData: FormData): Promise<void> {
       .update(slots)
       .set({ startsAt: addMinutes(s.startsAt, minutes), endsAt: addMinutes(s.endsAt, minutes) })
       .where(eq(slots.id, s.id));
+  }
+  revalidateRun(cycleId);
+}
+
+/**
+ * איפוס מצב הפעלה למחזור: מנקה את כל סימוני "התחיל/הסתיים",
+ * ומחזיר את כל החלונות ללוח זמנים נקי ורצוף על תאריך המחזור,
+ * החל משעת ההתחלה של החלון הראשון (ומתקן גם אם התאריך זז).
+ */
+export async function resetCycleRun(formData: FormData): Promise<void> {
+  await requireAdmin();
+  const cycleId = String(formData.get("cycleId") ?? "");
+
+  const [cycle] = await db.select().from(cycles).where(eq(cycles.id, cycleId));
+  if (!cycle) return;
+
+  const list = await db
+    .select()
+    .from(slots)
+    .where(eq(slots.cycleId, cycleId))
+    .orderBy(slots.startsAt);
+  if (!list.length) return;
+
+  const startTime = utcToIsraelFields(list[0].startsAt).time;
+  let cursor = israelLocalToUtc(cycle.eventDate, startTime);
+  for (const s of list) {
+    const dur = Math.max(5, diffMinutes(s.startsAt, s.endsAt));
+    const end = addMinutes(cursor, dur);
+    await db
+      .update(slots)
+      .set({ startsAt: cursor, endsAt: end, actualStartAt: null, actualEndAt: null })
+      .where(eq(slots.id, s.id));
+    cursor = end;
   }
   revalidateRun(cycleId);
 }

@@ -23,6 +23,7 @@ export default async function RunPage({
     endsAt: s.endsAt.toISOString(),
     capacity: s.capacity,
     taken: s.taken,
+    names: s.names,
     actualStartAt: s.actualStartAt?.toISOString() ?? null,
     actualEndAt: s.actualEndAt?.toISOString() ?? null,
   }));
